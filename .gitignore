@@ -22,6 +22,8 @@ bld/
 [Oo]bj/
 [Ll]og/
 [Ll]ogs/
+[Oo]ut/
+[Bb]uild/
 
 # .NET Core
 project.lock.json
@@ -52,3 +54,24 @@ CodeCoverage/
 *.VisualState.xml
 TestResult.xml
 nunit-*.xml
+
+# Front-end build outputs
+node_modules/
+KismetFrontend/dist/
+
+# VS Code
+.vscode/
+
+# VS
+.vs/
+
+# Rider / JetBrains
+.idea/
+
+# Environment files
+.env
+.env.*
+
+# Sensitive data
+Kismet.API/appsettings.json
+Kismet.API/appsettings.Development.json
