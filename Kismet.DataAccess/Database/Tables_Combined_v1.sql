@@ -6,10 +6,10 @@
 CREATE TABLE dbo.[User] (
     UserID              int IDENTITY PRIMARY KEY,
     UserName            nvarchar(100) NOT NULL,
-    -- Şimdilik email zorunlu dedim ama kayıt olmak ve giriş yapmak için email VEYA telefon numarası isteyecek şekilde güncellenebilir
+    -- For now, only email is necessary but it can be modified to allow sign-ups with either email or phone
     ContactEmail        nvarchar(200) UNIQUE NOT NULL, 
     ContactPhone        nvarchar(20) UNIQUE NULL,
-    PasswordHash        nvarchar(255) NOT NULL,
+    PasswordHash        nvarchar(255) UNIQUE NOT NULL,
     UserType            varchar(8) NOT NULL CHECK (UserType IN ('Customer', 'Employee')),
     CreatedAt           datetime2 NOT NULL DEFAULT sysdatetime(),
     LastUpdatedAt       datetime2 NULL
@@ -47,7 +47,7 @@ CREATE TABLE dbo.[Customer] (
 CREATE TABLE dbo.[SavedPaymentMethod] (
     SPMID                int IDENTITY PRIMARY KEY,
     CustomerID           int NOT NULL,
-    -- Result of a encoding process with a special key can be recorded in CardNumber for security purposes
+    -- Result of an encoding process with a special key can be recorded in CardNumber for security purposes
     CardNumber           nvarchar(255) NOT NULL,
     CardType             nvarchar(20) NOT NULL CHECK (CardType IN ('Debit', 'Credit')),
     CardExpirationDate   date NOT NULL,
@@ -197,7 +197,7 @@ CREATE TABLE dbo.[Shipment] (
     OrderID              int NOT NULL,
     CustomsDocRef        nvarchar(100) NULL,
     -- 0 = Failed, 1 = Pending, 2 = In Transit, and 3 = Delivered
-    ShipmentStatus       int NOT NULL DEFAULT 0 CHECK (ShipmentStatus IN (0, 3)),
+    ShipmentStatus       int NOT NULL DEFAULT 1 CHECK (ShipmentStatus IN (0, 3)),
     IsLocked             bit NOT NULL DEFAULT 0,
     LockedAt             datetime2 NULL,
     ShipmentDate         date NULL,
