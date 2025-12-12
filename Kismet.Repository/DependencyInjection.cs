@@ -9,6 +9,8 @@ public static class DependencyInjection
     public static IServiceCollection AddRepositories(this IServiceCollection services)
     {
         services.AddScoped<ICustomerRepository, CustomerRepository>();
+        services.AddScoped<IUserRepository, UserRepository>();
+        services.AddScoped<IEmployeeRepository, EmployeeRepository>();
         return services;
     }
 }

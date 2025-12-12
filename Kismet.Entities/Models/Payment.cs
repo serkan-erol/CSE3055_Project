@@ -1,15 +1,48 @@
 using System;
+using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
-namespace Kismet.Entities.Models;
+namespace Kismet.Entities.Models {
 
-public class Payment
-{
-    public int PaymentId { get; set; }
-    public int TransactionId { get; set; }
-    public int? BillingId { get; set; }
-    public decimal PaymentAmount { get; set; }
-    public DateTime PaymentDate { get; set; }
-    public string? PaymentMethod { get; set; }
-    public string? ReferenceNumber { get; set; }
+    [Table("Payment")]
+    public class Payment
+    {
+        [Key]
+        [Column("PaymentID")]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        public int PaymentID { get; set; }
+
+        [Column("BillingID")]
+        [ForeignKey("Billing")]
+        public int BillingID { get; set; }
+
+        // Navigation property for the 1-to-M relationship with Billing
+        public Billing billing { get; set; } = null!;
+
+        [Column("FTransactionID")]
+        [ForeignKey("FinancialTransaction")]
+        public int FTransactionID { get; set; }
+
+        // Navigation property for the 1-to-M relationship with FinancialTransaction
+        public FinancialTransaction FinancialTransaction { get; set; } = null!;
+
+        [Required]
+        [Column("PaymentAmount")]
+        public decimal PaymentAmount { get; set; }
+
+        [Required]
+        [Column("PaymentType")]
+        public string PaymentType { get; set; } = string.Empty;
+
+        [Required]
+        [Column("PaymentDate")]
+        public DateTimeOffset PaymentDate { get; set; }
+
+        [Column("PaymentMethod")]
+        public string? PaymentMethod { get; set; }
+
+        [Column("ReferenceNumber")]
+        public string? ReferenceNumber { get; set; }
+    }
 }
-

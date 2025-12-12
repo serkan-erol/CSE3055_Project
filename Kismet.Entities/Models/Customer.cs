@@ -1,12 +1,38 @@
-namespace Kismet.Entities.Models;
+using System;
+using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
-public class Customer
+namespace Kismet.Entities.Models 
 {
-    public int CustomerId { get; set; }
-    public string CustomerName { get; set; } = string.Empty;
-    public string? CustomerType { get; set; }
-    public string? ReliabilityStatus { get; set; }
-    public string? PaymentType { get; set; }
-    public string? ContactInfo { get; set; }
-}
+    [Table("Customer")]
+    public class Customer
+    {
+        [Key]
+        [Column("CustomerID")]
+        [ForeignKey("AssociatedCustomer")]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        public int CustomerID { get; set; }
 
+        [Required]
+        [Column("UserType", TypeName = "char(8)")]
+        [ForeignKey("AssociatedCustomer")]
+        [DatabaseGenerated(DatabaseGeneratedOption.Computed)]
+        public string UserType { get; set; } = "Customer";
+
+        // Navigation property for the User super-type and Customer sub-type relationship
+        public User AssociatedCustomer { get; set; } = null!;
+
+        [Required]
+        [Column("CustomerNumber")]
+        [DatabaseGenerated(DatabaseGeneratedOption.Computed)]
+        public string CustomerNumber { get; set; } = string.Empty;
+
+        [Column("CustomerType")]
+        public string? EmployeeRole { get; set; }
+
+        [Required]
+        [Column("ReliabilityStatus")]
+        public bool ReliabilityStatus { get; set; }
+    }
+}

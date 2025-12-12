@@ -7,65 +7,65 @@ using Kismet.Repository.Interfaces;
 
 namespace Kismet.Repository.Repositories;
 
-public class CustomerRepository : ICustomerRepository
+public class EmployeeRepository : IEmployeeRepository
 {
     private readonly IDbConnectionFactory _connectionFactory;
 
-    public CustomerRepository(IDbConnectionFactory connectionFactory)
+    public EmployeeRepository(IDbConnectionFactory connectionFactory)
     {
         _connectionFactory = connectionFactory;
     }
 
     // Entity methods (for internal use if needed)
-    public async Task<IReadOnlyList<Customer>> GetAllAsync(CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<Employee>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         using var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken);
-        var customers = await connection.QueryAsync<Customer>(
-            new CommandDefinition(SqlQueries.Customer.GetAll, cancellationToken: cancellationToken));
-        return customers.ToList().AsReadOnly();
+        var employees = await connection.QueryAsync<Employee>(
+            new CommandDefinition(SqlQueries.Employee.GetAll, cancellationToken: cancellationToken));
+        return employees.ToList().AsReadOnly();
     }
 
-    public async Task<Customer?> GetByIdAsync(int customerId, CancellationToken cancellationToken = default)
+    public async Task<Employee?> GetByIdAsync(int employeeId, CancellationToken cancellationToken = default)
     {
         using var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken);
-        return await connection.QueryFirstOrDefaultAsync<Customer>(
-            new CommandDefinition(SqlQueries.Customer.GetById, 
-                new { CustomerID = customerId }, 
+        return await connection.QueryFirstOrDefaultAsync<Employee>(
+            new CommandDefinition(SqlQueries.Employee.GetById, 
+                new { EmployeeID = employeeId }, 
                 cancellationToken: cancellationToken));
     }
     
     /// <summary>
-    /// Get all customers
+    /// Get all employees
     /// </summary>
-    public async Task<IReadOnlyList<CustomerResponseDto>> GetAllDtoAsync(CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<EmployeeResponseDto>> GetAllDtoAsync(CancellationToken cancellationToken = default)
     {
         using var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken);
         
         // Dapper maps SQL result columns to DTO properties by name (case-insensitive)
-        var customers = await connection.QueryAsync<CustomerResponseDto>(
-            new CommandDefinition(SqlQueries.Customer.GetAllDto, cancellationToken: cancellationToken));
+        var employees = await connection.QueryAsync<EmployeeResponseDto>(
+            new CommandDefinition(SqlQueries.Employee.GetAllDto, cancellationToken: cancellationToken));
         
-        return customers.ToList().AsReadOnly();
+        return employees.ToList().AsReadOnly();
     }
 
     /// <summary>
-    /// Get customer by ID as DTO
+    /// Get employee by ID as DTO
     /// </summary>
-    public async Task<CustomerResponseDto?> GetByIdDtoAsync(int customerId, CancellationToken cancellationToken = default)
+    public async Task<EmployeeResponseDto?> GetByIdDtoAsync(int employeeId, CancellationToken cancellationToken = default)
     {
         using var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken);
         
-        // Dapper maps the SQL result to CustomerResponseDto
-        return await connection.QueryFirstOrDefaultAsync<CustomerResponseDto>(
-            new CommandDefinition(SqlQueries.Customer.GetByIdDto, 
-                new { CustomerID = customerId }, 
+        // Dapper maps the SQL result to EmployeeResponseDto  
+        return await connection.QueryFirstOrDefaultAsync<EmployeeResponseDto>(
+            new CommandDefinition(SqlQueries.Employee.GetByIdDto, 
+                new { EmployeeID = employeeId }, 
                 cancellationToken: cancellationToken));
     }
 
     /// <summary>
-    /// Create a new customer from DTO - Dapper maps DTO properties to SQL parameters
+    /// Create a new employee from DTO - Dapper maps DTO properties to SQL parameters
     /// </summary>
-    public async Task<CustomerResponseDto> CreateAsync(CreateCustomerDto dto, CancellationToken cancellationToken = default)
+    public async Task<EmployeeResponseDto> CreateAsync(CreateEmployeeDto dto, CancellationToken cancellationToken = default)
     {
         using var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken);
         using var transaction = await connection.BeginTransactionAsync(cancellationToken);
@@ -74,27 +74,27 @@ public class CustomerRepository : ICustomerRepository
         {
             // Insert User (super-type) - Dapper maps DTO properties to SQL parameters
             var userId = await connection.QuerySingleAsync<int>(
-                new CommandDefinition(SqlQueries.User.InsertCustomerUser, dto, 
+                new CommandDefinition(SqlQueries.User.InsertEmployeeUser, dto, 
                     transaction, cancellationToken: cancellationToken));
 
-            //aaa Generate CustomerNumber (we might want to use a stored procedure or function for this)
-            var customerNumber = $"C{userId:D9}"; // Format: C000000001
+            //aaa Generate EmployeeNumber (we might want to use a stored procedure or function in DB for this)
+            var employeeNumber = $"E{userId:D9}"; // Format: C000000001
 
-            // Insert Customer (sub-type) - create anonymous object from DTO + generated values
+            // Insert Employee (sub-type) - create anonymous object from DTO + generated values
             await connection.ExecuteAsync(
-                new CommandDefinition(SqlQueries.Customer.InsertCustomer, new
+                new CommandDefinition(SqlQueries.Employee.InsertEmployee, new
                 {
-                    CustomerID = userId,
-                    CustomerNumber = customerNumber,
-                    dto.CustomerType,
-                    dto.ReliabilityStatus
+                    EmployeeID = userId,
+                    EmployeeNumber = employeeNumber,
+                    dto.EmployeeRole,
+                    dto.AccessLevel
                 }, transaction, cancellationToken: cancellationToken));
 
             await transaction.CommitAsync(cancellationToken);
 
-            // Return the created customer as DTO
+            // Return the created employee as DTO
             return await GetByIdDtoAsync(userId, cancellationToken) 
-                ?? throw new InvalidOperationException("Failed to retrieve created customer");
+                ?? throw new InvalidOperationException("Failed to retrieve created employee");
         }
         catch
         {
@@ -104,9 +104,9 @@ public class CustomerRepository : ICustomerRepository
     }
 
     /// <summary>
-    /// Update only CustomerType
+    /// Update only EmployeeRole
     /// </summary>
-    public async Task<CustomerResponseDto?> UpdateCustomerTypeAsync(UpdateCustomerTypeDto dto, CancellationToken cancellationToken = default)
+    public async Task<EmployeeResponseDto?> UpdateEmployeeRoleAsync(UpdateEmployeeRoleDto dto, CancellationToken cancellationToken = default)
     {
         using var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken);
         using var transaction = await connection.BeginTransactionAsync(cancellationToken);
@@ -114,16 +114,16 @@ public class CustomerRepository : ICustomerRepository
         try
         {
             await connection.ExecuteAsync(
-                new CommandDefinition(SqlQueries.Customer.UpdateCustomerType, new
+                new CommandDefinition(SqlQueries.Employee.UpdateEmployeeRole, new
                 {
-                    CustomerID = dto.CustomerID,
-                    dto.CustomerType
+                    EmployeeID = dto.EmployeeID,
+                    dto.EmployeeRole
                 }, transaction, cancellationToken: cancellationToken));
 
             await transaction.CommitAsync(cancellationToken);
 
-            // Return updated customer as DTO
-            return await GetByIdDtoAsync(dto.CustomerID, cancellationToken);
+            // Return updated employee as DTO
+            return await GetByIdDtoAsync(dto.EmployeeID, cancellationToken);
         }
         catch
         {
@@ -133,9 +133,9 @@ public class CustomerRepository : ICustomerRepository
     }
 
     /// <summary>
-    /// Update only ReliabilityStatus
+    /// Update only AccessLevel
     /// </summary>
-    public async Task<CustomerResponseDto?> UpdateCustomerReliabilityAsync(UpdateCustomerReliabilityDto dto, CancellationToken cancellationToken = default)
+    public async Task<EmployeeResponseDto?> UpdateEmployeeAccessLevelAsync(UpdateEmployeeAccessLevelDto dto, CancellationToken cancellationToken = default)
     {
         using var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken);
         using var transaction = await connection.BeginTransactionAsync(cancellationToken);
@@ -143,14 +143,14 @@ public class CustomerRepository : ICustomerRepository
         try
         {
             await connection.ExecuteAsync(
-                new CommandDefinition(SqlQueries.Customer.UpdateCustomerReliability, new
+                new CommandDefinition(SqlQueries.Employee.UpdateEmployeeAccessLevel, new
                 {
-                    CustomerID = dto.CustomerID,
-                    dto.ReliabilityStatus
+                    EmployeeID = dto.EmployeeID,
+                    dto.AccessLevel
                 }, transaction, cancellationToken: cancellationToken));
 
             await transaction.CommitAsync(cancellationToken);
-            return await GetByIdDtoAsync(dto.CustomerID, cancellationToken);
+            return await GetByIdDtoAsync(dto.EmployeeID, cancellationToken);
         }
         catch
         {
@@ -159,21 +159,21 @@ public class CustomerRepository : ICustomerRepository
         }
     }
 
-    public async Task<bool> DeleteAsync(int customerId, CancellationToken cancellationToken = default)
+    public async Task<bool> DeleteAsync(int employeeId, CancellationToken cancellationToken = default)
     {
-        // Delete from Customer first (sub-type), then User (super-type)
+        // Delete from Employee first (sub-type), then User (super-type)
         // Note: This assumes CASCADE DELETE is not configured
         using var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken);
         using var transaction = await connection.BeginTransactionAsync(cancellationToken);
 
         try
         {
-            var customerDeleted = await connection.ExecuteAsync(
-                new CommandDefinition(SqlQueries.Customer.DeleteCustomer, 
-                    new { CustomerID = customerId }, 
+            var employeeDeleted = await connection.ExecuteAsync(
+                new CommandDefinition(SqlQueries.Employee.DeleteEmployee, 
+                    new { EmployeeID = employeeId }, 
                     transaction, cancellationToken: cancellationToken));
 
-            if (customerDeleted == 0)
+            if (employeeDeleted == 0)
             {
                 await transaction.RollbackAsync(cancellationToken);
                 return false;
@@ -181,7 +181,7 @@ public class CustomerRepository : ICustomerRepository
 
             await connection.ExecuteAsync(
                 new CommandDefinition(SqlQueries.User.DeleteUser, 
-                    new { UserID = customerId }, 
+                    new { UserID = employeeId }, 
                     transaction, cancellationToken: cancellationToken));
 
             await transaction.CommitAsync(cancellationToken);
