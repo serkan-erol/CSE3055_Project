@@ -12,9 +12,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Kismet.Bussiness\Kismet.Bussiness.csproj" />
-    <ProjectReference Include="..\Kismet.Entities\Kismet.Entities.csproj" />
     <ProjectReference Include="..\Kismet.Core\Kismet.Core.csproj" />
+    <ProjectReference Include="..\Kismet.Infrastructure\Kismet.Infrastructure.csproj" />
+    <ProjectReference Include="..\Kismet.DataAccess\Kismet.DataAccess.csproj" />
+    <ProjectReference Include="..\Kismet.Entities\Kismet.Entities.csproj" />
+    <ProjectReference Include="..\Kismet.Repository\Kismet.Repository.csproj" />
   </ItemGroup>
 
 </Project>

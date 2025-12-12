@@ -1,8 +1,10 @@
-using Kismet.Bussiness;
-using Kismet.DataAccess;
 using Kismet.Infrastructure;
+using Kismet.Repository;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Host lifetime is tied to the console (Ctrl+C / console close)
+builder.Host.UseConsoleLifetime();
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
@@ -11,14 +13,13 @@ builder.Services.AddSwaggerGen();
 const string LocalCorsPolicy = "LocalCorsPolicy";
 var allowedOrigins = new[]
 {
-    "http://localhost:5098",
-    "https://localhost:5098"
+    "http://localhost:3055",
+    "https://localhost:3055"
 };
 
 builder.Services
-    .AddInfrastructure(builder.Configuration)
-    .AddDataAccess(builder.Configuration)
-    .AddBusinessServices();
+    .AddInfrastructure(builder.Configuration)  // Registers SqlConnectionFactory
+    .AddRepositories();                        // Registers repositories
 
 builder.Services.AddCors(options =>
 {
