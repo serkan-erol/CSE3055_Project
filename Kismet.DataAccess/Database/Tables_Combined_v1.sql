@@ -7,10 +7,10 @@ CREATE TABLE dbo.[User] (
     UserID              int IDENTITY PRIMARY KEY,
     UserName            nvarchar(100) NOT NULL,
     -- For now, only email is necessary but it can be modified to allow sign-ups with either email or phone
-    ContactEmail        nvarchar(200) UNIQUE NOT NULL, 
+    ContactEmail        nvarchar(100) UNIQUE NOT NULL, 
     ContactPhone        nvarchar(20) UNIQUE NULL,
-    PasswordHash        nvarchar(255) UNIQUE NOT NULL,
-    UserType            varchar(8) NOT NULL CHECK (UserType IN ('Customer', 'Employee')),
+    PasswordHash        nvarchar(255) NOT NULL,
+    UserType            char(8) NOT NULL CHECK (UserType IN ('Customer', 'Employee')),
     CreatedAt           datetime2 NOT NULL DEFAULT sysdatetime(),
     LastUpdatedAt       datetime2 NULL
 );
@@ -21,7 +21,7 @@ CREATE UNIQUE INDEX UQ_User_UserID_UserType ON dbo.[User](UserID, UserType);
 -- Employee Sub-Type --
 CREATE TABLE dbo.[Employee] (
     EmployeeID          int PRIMARY KEY,
-    UserType            AS 'Employee' PERSISTED,
+    UserType            AS CAST('Employee' AS char(8)) PERSISTED,
     EmployeeNumber      char(10) NOT NULL DEFAULT 'E000000000',
     EmployeeRole        nvarchar(50) NOT NULL,
     AccessLevel         int NOT NULL,
@@ -33,9 +33,9 @@ CREATE TABLE dbo.[Employee] (
 -- Customer Sub-Type --
 CREATE TABLE dbo.[Customer] (
     CustomerID          int PRIMARY KEY,
-    UserType            AS 'Customer' PERSISTED,
+    UserType            AS CAST('Customer' AS char(8)) PERSISTED,
     CustomerNumber      char(10) NOT NULL DEFAULT 'C000000000',
-    CustomerType        nvarchar(50)  NULL,
+    CustomerType        nvarchar(50) NULL,
     -- Created as a reliable customer. Stays that way unless updated manually by employees.
     ReliabilityStatus  bit NOT NULL DEFAULT 1, -- 1 = Reliable /// 0 = Unreliable
 
@@ -51,7 +51,7 @@ CREATE TABLE dbo.[SavedPaymentMethod] (
     CardNumber           nvarchar(255) NOT NULL,
     CardType             nvarchar(20) NOT NULL CHECK (CardType IN ('Debit', 'Credit')),
     CardExpirationDate   date NOT NULL,
-    RecordExpirationDate date NOT NULL,
+    RecordExpirationDate date NULL,
     CreatedAt            datetime2 NOT NULL DEFAULT sysdatetime(),
     LastUpdatedAt        datetime2 NULL,
 
@@ -78,8 +78,8 @@ CREATE TABLE dbo.[Billing] (
     BillingID        int IDENTITY PRIMARY KEY,
     CustomerID       int NOT NULL,
     InvoiceNumber    nvarchar(50) NOT NULL UNIQUE,
-    TotalDue         decimal(18,2) NOT NULL,
-    TotalPaid        decimal(18,2) NOT NULL DEFAULT 0.00,
+    TotalDue         decimal(18, 2) NOT NULL,
+    TotalPaid        decimal(18, 2) NOT NULL DEFAULT 0.00,
     RemainingBalance AS (TotalDue - TotalPaid) PERSISTED,
     PaymentTerms     nvarchar(255) NULL,
     BillingDate      date NOT NULL DEFAULT CAST(getdate() as date),
@@ -97,8 +97,8 @@ CREATE TABLE dbo.[Order] (
     OrderID        int IDENTITY PRIMARY KEY,
     CustomerID     int NOT NULL,
     OrderDate      date NOT NULL DEFAULT CAST(getdate() as date),
-    -- 0 = Cancelled, 1 = Pending, 2 = Approved, 3 = Shipped, 4 = Delivered
-    OrderStatus    int NOT NULL DEFAULT 1 CHECK (OrderStatus IN (0, 4)),
+    -- 0 = Pending, 1 = Approved, 2 = Shipped, 3 = Delivered, and 4 = Cancelled
+    OrderStatus    int NOT NULL DEFAULT 0 CHECK (OrderStatus IN (0, 4)),
     IsLocked       bit NOT NULL DEFAULT 0,
     LockedAt       datetime2 NULL,
     OrderType      nvarchar(8) NOT NULL CHECK (OrderType IN ('Purchase', 'Supply')),
@@ -114,25 +114,25 @@ CREATE UNIQUE INDEX UQ_Order_OrderID_OrderType ON dbo.[Order](OrderID, OrderType
 
 -- Supply Order Sub-Type --
 CREATE TABLE dbo.[SupplyOrder] (
-    OrderID         int PRIMARY KEY,
+    SOrderID        int PRIMARY KEY,
     OrderType       AS CAST('Supply' AS nvarchar(8)) PERSISTED,
-    AmountOwed      decimal(18,2) NOT NULL,
+    AmountOwed      decimal(18, 2) NOT NULL,
 
     CONSTRAINT FK_SupplyOrder_Order_Subtype
-        FOREIGN KEY (OrderID, OrderType) REFERENCES dbo.[Order](OrderID, OrderType)
+        FOREIGN KEY (SOrderID, OrderType) REFERENCES dbo.[Order](OrderID, OrderType)
 );
 
 -- Purchase Order Sub-Type --
 CREATE TABLE dbo.[PurchaseOrder] (
-    OrderID         int PRIMARY KEY,
+    POrderID        int PRIMARY KEY,
     OrderType       AS CAST('Purchase' AS nvarchar(8)) PERSISTED,
-    TotalAmount     decimal(18,2) NOT NULL,
+    TotalAmount     decimal(18, 2) NOT NULL,
     IsApproved      bit NOT NULL DEFAULT 0,
-    ApprovedBy      int NOT NULL,
-    ApprovalDate    datetime2 NOT NULL,
+    ApprovedBy      int NULL,
+    ApprovalDate    datetime2 NULL,
 
     CONSTRAINT FK_PurchaseOrder_Order_Subtype
-        FOREIGN KEY (OrderID, OrderType) REFERENCES dbo.[Order](OrderID, OrderType)
+        FOREIGN KEY (POrderID, OrderType) REFERENCES dbo.[Order](OrderID, OrderType)
 );
 
 -- FinancialTransaction --
@@ -141,9 +141,9 @@ CREATE TABLE dbo.[FinancialTransaction] (
     CustomerID          int NOT NULL,
     BillingID           int NOT NULL,
     OrderID             int NOT NULL,
-    TransactionType     nvarchar(50) NOT NULL CHECK (TransactionType IN ('Puchase', 'Sale')),
-    TotalAmount         decimal(18,2) NOT NULL,
-    TotalPaid           decimal(18,2) NOT NULL DEFAULT 0.00,
+    TransactionType     nvarchar(10) NOT NULL CHECK (TransactionType IN ('Puchase', 'Sale')),
+    TotalAmount         decimal(18, 2) NOT NULL,
+    TotalPaid           decimal(18, 2) NOT NULL DEFAULT 0.00,
     RemainingBalance    AS (TotalAmount - TotalPaid) PERSISTED,
     -- 0 = Unpaid, 1 = Partial, 2 = Paid
     PaymentStatus       int NOT NULL DEFAULT 0 CHECK (PaymentStatus IN (0, 2)), 
@@ -164,8 +164,8 @@ CREATE TABLE dbo.[Treasury] (
     TreasuryID      int IDENTITY PRIMARY KEY,
     FTransactionID  int NOT NULL,
     EntryDate       datetime2 NOT NULL DEFAULT sysdatetime(),
-    Amount          decimal(18,2) NOT NULL,
-    BalanceAfter    decimal(18,2) NOT NULL,
+    Amount          decimal(18, 2) NOT NULL,
+    BalanceAfter    decimal(18, 2) NOT NULL,
     Description     nvarchar(255) NULL,
     -- There should NOT be any updated in the rows of this table. This is to check if we are doing it right
     LastUpdatedAt   datetime2 NULL,
@@ -179,7 +179,7 @@ CREATE TABLE dbo.[Payment] (
     PaymentID        int IDENTITY PRIMARY KEY,
     BillingID        int NOT NULL,
     FTransactionID   int NOT NULL,
-    PaymentAmount    decimal(18,2) NOT NULL,
+    PaymentAmount    decimal(18, 2) NOT NULL,
     PaymentType      nvarchar(50) NOT NULL, -- Send money or Recieve depending on the Transaction and/or  related Order Type
     PaymentDate      datetime2 NOT NULL DEFAULT sysdatetime(),
     PaymentMethod    nvarchar(50) NULL,     -- Cash, credit card, debit card etc.
@@ -194,10 +194,10 @@ CREATE TABLE dbo.[Payment] (
 -- Shipment --
 CREATE TABLE dbo.[Shipment] (
     ShipmentID           int IDENTITY PRIMARY KEY,
-    OrderID              int NOT NULL,
+    POrderID             int NOT NULL,
     CustomsDocRef        nvarchar(100) NULL,
-    -- 0 = Failed, 1 = Pending, 2 = In Transit, and 3 = Delivered
-    ShipmentStatus       int NOT NULL DEFAULT 1 CHECK (ShipmentStatus IN (0, 3)),
+    -- 0 = Pending, 1 = In Transit, 2 = Delivered, and 3 = Failed
+    ShipmentStatus       int NOT NULL DEFAULT 0 CHECK (ShipmentStatus IN (0, 3)),
     IsLocked             bit NOT NULL DEFAULT 0,
     LockedAt             datetime2 NULL,
     ShipmentDate         date NULL,
@@ -209,7 +209,7 @@ CREATE TABLE dbo.[Shipment] (
     LastUpdatedAt        datetime2 NULL,
 
     CONSTRAINT FK_Shipment_Order
-        FOREIGN KEY (OrderID) REFERENCES dbo.[Order](OrderID)
+        FOREIGN KEY (POrderID) REFERENCES dbo.[Order](OrderID)
 );
 
 -- Fabric --
@@ -228,9 +228,9 @@ CREATE TABLE dbo.[Fabric] (
 CREATE TABLE dbo.[UnitPrice] (
     UPID                int IDENTITY PRIMARY KEY,
     FabricID            int NOT NULL,
-    UnitPrice           decimal(18,2) NOT NULL,
+    Price               decimal(18, 2) NOT NULL,
     Currency            nvarchar(50) NOT NULL,
-    EquivalentTLPrice   decimal(18,2) NOT NULL,
+    EquivalentTLPrice   decimal(18, 2) NOT NULL,
 
     CONSTRAINT FK_UnitPrice_Fabric
         FOREIGN KEY (FabricID) REFERENCES dbo.[Fabric](FabricID)
@@ -244,7 +244,7 @@ CREATE TABLE dbo.[Batch] (
     FabricID        int NOT NULL,
     BatchNumber     nvarchar(50) NOT NULL UNIQUE,
     Quantity        int NOT NULL,
-    BatchPrice      decimal(18,2) NOT NULL,
+    BatchPrice      decimal(18, 2) NOT NULL,
     ProductionDate  date NULL,
     QualityGrade    nvarchar(50) NULL,
     CreatedAt       datetime2 NOT NULL DEFAULT sysdatetime(),  
