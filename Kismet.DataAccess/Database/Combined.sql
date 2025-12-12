@@ -256,3 +256,62 @@ CREATE TABLE dbo.[Batch] (
     CONSTRAINT FK_Batch_Fabric
         FOREIGN KEY (FabricID) REFERENCES dbo.[Fabric](FabricID)
 );
+
+--------------------------------------------------------------------------------------------------------------------------------------
+-------------------------------------------------------- FUNCTIONS & TRIGGERS --------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------------------------------
+
+-- Trigger to validate that the customer who placed the order matches the customer who is being billed --
+CREATE OR ALTER TRIGGER dbo.TR_Billing_ValidateCustomer
+ON dbo.[Billing]
+AFTER INSERT, UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    IF EXISTS (
+        SELECT 1
+        FROM inserted i
+        INNER JOIN dbo.[FinancialTransaction] ft ON ft.BillingID = i.BillingID
+        INNER JOIN dbo.[Order] o ON o.OrderID = ft.OrderID
+        WHERE o.CustomerID <> i.CustomerID
+    )
+    BEGIN
+        RAISERROR ('Billing.CustomerID must match the customer who placed the order.', 16, 1);
+        ROLLBACK TRANSACTION;
+    END
+END;
+
+-- A function and a trigger to check if the payment amount is NOT greater than the remaining debt (RemainingBalance in Billing table) --
+CREATE OR ALTER FUNCTION dbo.FN_CheckPaymentAmount
+(
+    @PaymentAmount decimal(18, 2),
+    @RemainingBalance decimal(18, 2)
+)
+RETURNS bit
+AS
+BEGIN
+    RETURN CASE WHEN @PaymentAmount > @RemainingBalance THEN 0 ELSE 1 END;
+END;
+
+CREATE OR ALTER TRIGGER dbo.TR_Payment_CheckPaymentAmount
+ON dbo.[Payment]
+AFTER INSERT
+AS
+BEGIN
+    SET NOCOUNT ON;
+END;
+    IF EXISTS (
+        SELECT 1
+        FROM inserted i
+        INNER JOIN dbo.[Billing] b ON b.BillingID = i.BillingID
+        WHERE dbo.FN_CheckPaymentAmount(i.PaymentAmount, b.RemainingBalance) = 0
+    )
+    BEGIN
+        RAISERROR ('Payment amount is greater than the remaining debt.', 16, 1);
+        ROLLBACK TRANSACTION;
+    END
+END;
+
+-- A function to make sure unreliable customers pay upfront and bill is paid completely before approving the order --
+-- !!! --

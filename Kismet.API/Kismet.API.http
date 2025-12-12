@@ -1,0 +1,6 @@
+@Kismet.API_HostAddress = https://localhost:3055
+
+GET {{Kismet.API_HostAddress}}/swagger/index.html
+Accept: application/json
+
+###
