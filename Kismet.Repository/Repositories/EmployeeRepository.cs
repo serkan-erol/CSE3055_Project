@@ -77,15 +77,11 @@ public class EmployeeRepository : IEmployeeRepository
                 new CommandDefinition(SqlQueries.User.InsertEmployeeUser, dto, 
                     transaction, cancellationToken: cancellationToken));
 
-            //aaa Generate EmployeeNumber (we might want to use a stored procedure or function in DB for this)
-            var employeeNumber = $"E{userId:D9}"; // Format: C000000001
-
             // Insert Employee (sub-type) - create anonymous object from DTO + generated values
             await connection.ExecuteAsync(
                 new CommandDefinition(SqlQueries.Employee.InsertEmployee, new
                 {
                     EmployeeID = userId,
-                    EmployeeNumber = employeeNumber,
                     dto.EmployeeRole,
                     dto.AccessLevel
                 }, transaction, cancellationToken: cancellationToken));

@@ -77,15 +77,11 @@ public class CustomerRepository : ICustomerRepository
                 new CommandDefinition(SqlQueries.User.InsertCustomerUser, dto, 
                     transaction, cancellationToken: cancellationToken));
 
-            //aaa Generate CustomerNumber (we might want to use a stored procedure or function for this)
-            var customerNumber = $"C{userId:D9}"; // Format: C000000001
-
             // Insert Customer (sub-type) - create anonymous object from DTO + generated values
             await connection.ExecuteAsync(
                 new CommandDefinition(SqlQueries.Customer.InsertCustomer, new
                 {
                     CustomerID = userId,
-                    CustomerNumber = customerNumber,
                     dto.CustomerType,
                     dto.ReliabilityStatus
                 }, transaction, cancellationToken: cancellationToken));

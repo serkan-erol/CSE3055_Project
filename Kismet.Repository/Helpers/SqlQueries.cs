@@ -159,8 +159,8 @@ public static class SqlQueries
             WHERE c.CustomerID = @CustomerID";
 
         public const string InsertCustomer = @"
-            INSERT INTO dbo.[Customer] (CustomerID, CustomerNumber, CustomerType, ReliabilityStatus)
-            VALUES (@CustomerID, @CustomerNumber, @CustomerType, @ReliabilityStatus);";
+            INSERT INTO dbo.[Customer] (CustomerID, CustomerType, ReliabilityStatus)
+            VALUES (@CustomerID, @CustomerType, @ReliabilityStatus);";
 
         public const string UpdateCustomerType = @"
             UPDATE dbo.[Customer]
@@ -237,8 +237,8 @@ public static class SqlQueries
             WHERE e.EmployeeID = @EmployeeID";
 
         public const string InsertEmployee = @"
-            INSERT INTO dbo.[Employee] (EmployeeID, EmployeeNumber, EmployeeRole, AccessLevel)
-            VALUES (@EmployeeID, @EmployeeNumber, @EmployeeRole, @AccessLevel);";
+            INSERT INTO dbo.[Employee] (EmployeeID, EmployeeRole, AccessLevel)
+            VALUES (@EmployeeID, @EmployeeRole, @AccessLevel);";
 
         public const string UpdateEmployeeRole = @"
             UPDATE dbo.[Employee]

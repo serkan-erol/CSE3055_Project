@@ -71,7 +71,3 @@ KismetFrontend/dist/
 # Environment files
 .env
 .env.*
-
-# Sensitive data
-Kismet.API/appsettings.json
-Kismet.API/appsettings.Development.json
