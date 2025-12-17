@@ -56,6 +56,6 @@ namespace Kismet.Entities.Models
         public DateTimeOffset CreatedAt { get; set; }
 
         [Column("LastUpdatedAt")]
-        public DateTimeOffset? LastUpdatedAt { get; set; } = null!;
+        public DateTimeOffset? LastUpdatedAt { get; set; }
     }
 }

@@ -1,3 +1,8 @@
+CREATE DATABASE KismetDB;
+GO
+USE KismetDB;
+GO
+
 --------------------------------------------------------------------------------------------------------------------------------
 ------------------------------------------------------------ TABLES ------------------------------------------------------------
 --------------------------------------------------------------------------------------------------------------------------------
@@ -24,7 +29,7 @@ CREATE TABLE dbo.[Employee] (
     UserType            AS CAST('Employee' AS char(8)) PERSISTED,
     EmployeeNumber      char(10) NOT NULL DEFAULT 'E000000000',
     EmployeeRole        nvarchar(50) NOT NULL,
-    AccessLevel         int NOT NULL,
+    AccessLevel         int NOT NULL CHECK (AccessLevel >= 0 AND AccessLevel <= 10),
 
     CONSTRAINT FK_Employee_User_Subtype
         FOREIGN KEY (EmployeeID, UserType) REFERENCES dbo.[User](UserID, UserType)
@@ -266,7 +271,6 @@ CREATE TABLE dbo.[Batch] (
         FOREIGN KEY (FabricID) REFERENCES dbo.[Fabric](FabricID)
 );
 
-
 --------------------------------------------------------------------------------------------------------------------------------
 ---------------------------------------------------------- PROCEDURES ----------------------------------------------------------
 --------------------------------------------------------------------------------------------------------------------------------
@@ -344,14 +348,25 @@ END;
 GO
 
 --------------------------------------------------------------------------------------------------------------------------------
+
+-- Procedure to update User LastUpdatedAt timestamp
+CREATE PROCEDURE dbo.Update_UserLastUpdatedAt
+    @UserID int
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    UPDATE dbo.[User]
+    SET LastUpdatedAt = sysdatetime()
+    WHERE UserID = @UserID;
+END;
+GO
+
+--------------------------------------------------------------------------------------------------------------------------------
 ----------------------------------------------------------- TRIGGERS -----------------------------------------------------------
 --------------------------------------------------------------------------------------------------------------------------------
 
--- Trigger to auto-generate EmployeeNumber on Employee insert
-IF OBJECT_ID('dbo.trg_GenerateEmployeeNumber', 'TR') IS NOT NULL
-    DROP TRIGGER dbo.trg_GenerateEmployeeNumber;
-GO
-
+-- Trigger to auto-generate random and unique EmployeeNumber on Employee insert
 CREATE TRIGGER dbo.trg_GenerateEmployeeNumber
 ON dbo.[Employee]
 AFTER INSERT
@@ -383,11 +398,7 @@ GO
 
 --------------------------------------------------------------------------------------------------------------------------------
 
--- Trigger to auto-generate CustomerNumber on Customer insert
-IF OBJECT_ID('dbo.trg_GenerateCustomerNumber', 'TR') IS NOT NULL
-    DROP TRIGGER dbo.trg_GenerateCustomerNumber;
-GO
-
+-- Trigger to auto-generate random and unique CustomerNumber on Customer insert
 CREATE TRIGGER dbo.trg_GenerateCustomerNumber
 ON dbo.[Customer]
 AFTER INSERT
@@ -414,5 +425,84 @@ BEGIN
 
     CLOSE customer_cursor;
     DEALLOCATE customer_cursor;
+END;
+GO
+
+--------------------------------------------------------------------------------------------------------------------------------
+
+-- Trigger to update User LastUpdatedAt when User table is updated
+CREATE TRIGGER dbo.trg_Update_UserLastUpdatedAt_User
+ON dbo.[User]
+AFTER UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    -- Only update following columns were changed
+    -- UserName, ContactEmail, ContactPhone, PasswordHash
+    IF EXISTS (
+        SELECT 1 FROM inserted i
+        INNER JOIN deleted d ON i.UserID = d.UserID
+        WHERE (i.UserName <> d.UserName 
+            OR i.ContactEmail <> d.ContactEmail 
+            OR i.ContactPhone <> d.ContactPhone 
+            OR i.PasswordHash <> d.PasswordHash)
+    )
+    BEGIN
+        DECLARE @UserID int = (SELECT UserID FROM inserted);
+        EXEC dbo.Update_UserLastUpdatedAt @UserID = @UserID;
+    END
+END;
+GO
+
+--------------------------------------------------------------------------------------------------------------------------------
+
+-- Trigger to update User LastUpdatedAt when Employee table is updated
+CREATE TRIGGER dbo.trg_Update_UserLastUpdatedAt_Employee
+ON dbo.[Employee]
+AFTER UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    -- Only update following columns were changed
+    -- EmployeeRole, AccessLevel
+    IF EXISTS (
+        SELECT 1 FROM inserted i
+        INNER JOIN deleted d ON i.EmployeeID = d.EmployeeID
+        WHERE (i.EmployeeRole <> d.EmployeeRole 
+            OR i.AccessLevel <> d.AccessLevel)
+    )
+    BEGIN
+        DECLARE @UserID int = (SELECT EmployeeID FROM inserted);
+        EXEC dbo.Update_UserLastUpdatedAt @UserID = @UserID;
+    END
+END;
+GO
+
+--------------------------------------------------------------------------------------------------------------------------------
+
+-- Trigger to update User LastUpdatedAt when Customer table is updated
+CREATE TRIGGER dbo.trg_Update_UserLastUpdatedAt_Customer
+ON dbo.[Customer]
+AFTER UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    -- Only update following columns were changed
+    -- CustomerType, ReliabilityStatus
+    IF EXISTS (
+        SELECT 1 FROM inserted i
+        INNER JOIN deleted d ON i.CustomerID = d.CustomerID
+        WHERE (i.CustomerType <> d.CustomerType 
+            OR (i.CustomerType IS NULL AND d.CustomerType IS NOT NULL) 
+            OR (i.CustomerType IS NOT NULL AND d.CustomerType IS NULL) 
+            OR i.ReliabilityStatus <> d.ReliabilityStatus)
+    )
+    BEGIN
+        DECLARE @UserID int = (SELECT CustomerID FROM inserted);
+        EXEC dbo.Update_UserLastUpdatedAt @UserID = @UserID;
+    END
 END;
 GO

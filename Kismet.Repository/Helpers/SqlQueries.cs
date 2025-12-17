@@ -71,29 +71,26 @@ public static class SqlQueries
         public const string UpdateUserName = @"
             UPDATE dbo.[User]
             SET 
-                UserName = COALESCE(@UserName, UserName),
-                LastUpdatedAt = sysdatetime()
+                UserName = COALESCE(@UserName, UserName)
             WHERE UserID = @UserID";
 
         public const string UpdateUserEmail = @"
             UPDATE dbo.[User]
             SET 
-                ContactEmail = COALESCE(@ContactEmail, ContactEmail),
-                LastUpdatedAt = sysdatetime()
+                ContactEmail = COALESCE(@ContactEmail, ContactEmail)
             WHERE UserID = @UserID";
 
         public const string UpdateUserPhone = @"
             UPDATE dbo.[User]
             SET 
-                ContactPhone = COALESCE(@ContactPhone, ContactPhone),
-                LastUpdatedAt = sysdatetime()
+                ContactPhone = COALESCE(@ContactPhone, ContactPhone)
             WHERE UserID = @UserID";
 
         public const string UpdateUserPassword = @"
             UPDATE dbo.[User]
             SET 
-                PasswordHash = COALESCE(@PasswordHash, PasswordHash),
-                LastUpdatedAt = sysdatetime()
+                PasswordHash = COALESCE(@PasswordHash, PasswordHash)
+
             WHERE UserID = @UserID";
 
         public const string DeleteUser = "DELETE FROM dbo.[User] WHERE UserID = @UserID";
@@ -139,7 +136,8 @@ public static class SqlQueries
                 u.UserName,
                 u.ContactEmail,
                 u.ContactPhone,
-                u.CreatedAt
+                u.CreatedAt,
+                u.LastUpdatedAt
             FROM dbo.[Customer] c
             INNER JOIN dbo.[User] u ON u.UserID = c.CustomerID AND u.UserType = c.UserType
             ORDER BY c.CustomerID";
@@ -153,7 +151,8 @@ public static class SqlQueries
                 u.UserName,
                 u.ContactEmail,
                 u.ContactPhone,
-                u.CreatedAt
+                u.CreatedAt,
+                u.LastUpdatedAt
             FROM dbo.[Customer] c
             INNER JOIN dbo.[User] u ON u.UserID = c.CustomerID AND u.UserType = c.UserType
             WHERE c.CustomerID = @CustomerID";
@@ -217,7 +216,8 @@ public static class SqlQueries
                 u.UserName,
                 u.ContactEmail,
                 u.ContactPhone,
-                u.CreatedAt
+                u.CreatedAt,
+                u.LastUpdatedAt
             FROM dbo.[Employee] e
             INNER JOIN dbo.[User] u ON u.UserID = e.EmployeeID AND u.UserType = e.UserType
             ORDER BY e.EmployeeID";
@@ -231,7 +231,8 @@ public static class SqlQueries
                 u.UserName,
                 u.ContactEmail,
                 u.ContactPhone,
-                u.CreatedAt
+                u.CreatedAt,
+                u.LastUpdatedAt
             FROM dbo.[Employee] e
             INNER JOIN dbo.[User] u ON u.UserID = e.EmployeeID AND u.UserType = e.UserType
             WHERE e.EmployeeID = @EmployeeID";
