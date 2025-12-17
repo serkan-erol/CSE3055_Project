@@ -9,9 +9,9 @@
             cd .\Kismet.API
             dotnet run 
 When you see 4 green `info:` labels the back-end is running 
-4 - CTRL+Left Click on the http://localhost:3055 link on the top `info` label or open your browser and go to: http://localhost:3055/swagger/index.html 
+4 - CTRL+Left Click on the http://localhost:3055 link on the top `info:` label or open your browser and go to: http://localhost:3055/swagger/index.html 
     4.1 - You will see the SwaggerUI. This page let's you use the defined end-points of the API 
     4.2 - From here try to add a customer or an employee. Try to delete or modify them and check if you can see the changes in the DB itself
     4.3 - When you have a Customer, try creating an Order for that Customer
     4.4 - When you have an Employee, try approving, and updating that Order
-    4.5 - Test stuff like
+    4.5 - Test stuff like Locking an Order entry, test if it updated after being locked etc.
