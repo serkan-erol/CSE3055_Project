@@ -15,24 +15,6 @@ public class EmployeeRepository : IEmployeeRepository
     {
         _connectionFactory = connectionFactory;
     }
-
-    // Entity methods (for internal use if needed)
-    public async Task<IReadOnlyList<Employee>> GetAllAsync(CancellationToken cancellationToken = default)
-    {
-        using var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken);
-        var employees = await connection.QueryAsync<Employee>(
-            new CommandDefinition(SqlQueries.Employee.GetAll, cancellationToken: cancellationToken));
-        return employees.ToList().AsReadOnly();
-    }
-
-    public async Task<Employee?> GetByIdAsync(int employeeId, CancellationToken cancellationToken = default)
-    {
-        using var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken);
-        return await connection.QueryFirstOrDefaultAsync<Employee>(
-            new CommandDefinition(SqlQueries.Employee.GetById, 
-                new { EmployeeID = employeeId }, 
-                cancellationToken: cancellationToken));
-    }
     
     /// <summary>
     /// Get all employees
@@ -158,7 +140,6 @@ public class EmployeeRepository : IEmployeeRepository
     public async Task<bool> DeleteAsync(int employeeId, CancellationToken cancellationToken = default)
     {
         // Delete from Employee first (sub-type), then User (super-type)
-        // Note: This assumes CASCADE DELETE is not configured
         using var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken);
         using var transaction = await connection.BeginTransactionAsync(cancellationToken);
 
@@ -190,4 +171,3 @@ public class EmployeeRepository : IEmployeeRepository
         }
     }
 }
-

@@ -24,6 +24,11 @@ public class CustomerController : ControllerBase
         try
         {
             var customers = await _customerRepository.GetAllDtoAsync(cancellationToken);
+
+            if (customers.Count == 0)
+            {
+                return NotFound(new { error = "No customers found" });
+            }
             return Ok(customers);
         }
         catch (Exception ex)

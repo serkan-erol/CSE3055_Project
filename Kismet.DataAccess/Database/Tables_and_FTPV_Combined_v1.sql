@@ -1,3 +1,4 @@
+
 CREATE DATABASE KismetDB;
 GO
 USE KismetDB;
@@ -91,7 +92,7 @@ CREATE TABLE dbo.[Billing] (
     PaymentTerms     nvarchar(255) NULL,
     BillingDate      date NOT NULL DEFAULT CAST(getdate() as date),
     -- 0 = Unpaid, 1 = Partial, 2 = Paid
-    BillingStatus    int NOT NULL DEFAULT 0 CHECK(BillingStatus IN (0,2)),
+    BillingStatus    int NOT NULL DEFAULT 0 CHECK(BillingStatus BETWEEN 0 AND 2),
     CreatedAt        datetime2 NOT NULL DEFAULT sysdatetime(),
     LastUpdatedAt    datetime2 NULL,
 
@@ -103,48 +104,29 @@ CREATE TABLE dbo.[Billing] (
 
 -- Order Super-Type --
 CREATE TABLE dbo.[Order] (
-    OrderID        int IDENTITY PRIMARY KEY,
-    CustomerID     int NOT NULL,
-    OrderDate      date NOT NULL DEFAULT CAST(getdate() as date),
+    OrderID         int IDENTITY PRIMARY KEY,
+    CustomerID      int NOT NULL,
+    OrderNumber     nvarchar(50) NOT NULL DEFAULT 'Order00000',
+    OrderType       nvarchar(8) NOT NULL CHECK (OrderType IN ('Purchase', 'Supply')),
+    TotalAmount     decimal(18, 2) NOT NULL DEFAULT 0.00,
     -- 0 = Pending, 1 = Approved, 2 = Shipped, 3 = Delivered, and 4 = Cancelled
-    OrderStatus    int NOT NULL DEFAULT 0 CHECK (OrderStatus IN (0, 4)),
-    IsLocked       bit NOT NULL DEFAULT 0,
-    LockedAt       datetime2 NULL,
-    OrderType      nvarchar(8) NOT NULL CHECK (OrderType IN ('Purchase', 'Supply')),
-    CreatedAt      datetime2 NOT NULL DEFAULT sysdatetime(),
-    LastUpdatedAt  datetime2 NULL,
-
-    CONSTRAINT FK_Order_Customer
-        FOREIGN KEY (CustomerID) REFERENCES dbo.[Customer](CustomerID)
-);
-
--- Unique index to support the foreing key references for the Supply / Purchase Order tables
-CREATE UNIQUE INDEX UQ_Order_OrderID_OrderType ON dbo.[Order](OrderID, OrderType);
-
--- Supply Order Sub-Type --
-CREATE TABLE dbo.[SupplyOrder] (
-    SOrderID        int PRIMARY KEY,
-    OrderType       AS CAST('Supply' AS nvarchar(8)) PERSISTED,
-    AmountOwed      decimal(18, 2) NOT NULL,
-
-    CONSTRAINT FK_SupplyOrder_Order_Subtype
-        FOREIGN KEY (SOrderID, OrderType) REFERENCES dbo.[Order](OrderID, OrderType)
-);
-
--- Purchase Order Sub-Type --
-CREATE TABLE dbo.[PurchaseOrder] (
-    POrderID        int PRIMARY KEY,
-    OrderType       AS CAST('Purchase' AS nvarchar(8)) PERSISTED,
-    TotalAmount     decimal(18, 2) NOT NULL,
+    OrderStatus     int NOT NULL DEFAULT 0 CHECK (OrderStatus BETWEEN 0 AND 4),
     IsApproved      bit NOT NULL DEFAULT 0,
     ApprovedBy      int NULL,
     ApprovalDate    datetime2 NULL,
+    IsLocked        bit NOT NULL DEFAULT 0,
+    LockedAt        datetime2 NULL,
+    OrderDate       datetime2 NOT NULL DEFAULT sysdatetime(),    
+    LastUpdatedAt   datetime2 NULL,
 
-    CONSTRAINT FK_PurchaseOrder_Order_Subtype
-        FOREIGN KEY (POrderID, OrderType) REFERENCES dbo.[Order](OrderID, OrderType)
+    CONSTRAINT FK_Order_Customer
+        FOREIGN KEY (CustomerID) REFERENCES dbo.[Customer](CustomerID),
+    CONSTRAINT FK_Order_Employee
+        FOREIGN KEY (ApprovedBy) REFERENCES dbo.[Employee](EmployeeID)
 );
 
 --------------------------------------------------------------------------------------------------------------------------------
+
 -- FinancialTransaction --
 CREATE TABLE dbo.[FinancialTransaction] (
     FTransactionID      int IDENTITY PRIMARY KEY,
@@ -156,7 +138,7 @@ CREATE TABLE dbo.[FinancialTransaction] (
     TotalPaid           decimal(18, 2) NOT NULL DEFAULT 0.00,
     RemainingBalance    AS (TotalAmount - TotalPaid) PERSISTED,
     -- 0 = Unpaid, 1 = Partial, 2 = Paid
-    PaymentStatus       int NOT NULL DEFAULT 0 CHECK (PaymentStatus IN (0, 2)), 
+    PaymentStatus       int NOT NULL DEFAULT 0 CHECK (PaymentStatus BETWEEN 0 AND 2), 
     Description         nvarchar(255) NULL,
     TransactionDate     datetime2 NOT NULL DEFAULT sysdatetime(),
     LastUpdatedAt       datetime2 NULL,
@@ -173,10 +155,10 @@ CREATE TABLE dbo.[FinancialTransaction] (
 CREATE TABLE dbo.[Treasury] (
     TreasuryID      int IDENTITY PRIMARY KEY,
     FTransactionID  int NOT NULL,
-    EntryDate       datetime2 NOT NULL DEFAULT sysdatetime(),
     Amount          decimal(18, 2) NOT NULL,
     BalanceAfter    decimal(18, 2) NOT NULL,
     Description     nvarchar(255) NULL,
+    EntryDate       datetime2 NOT NULL DEFAULT sysdatetime(),
     -- There should NOT be any updated in the rows of this table. This is to check if we are doing it right
     LastUpdatedAt   datetime2 NULL,
 
@@ -209,7 +191,7 @@ CREATE TABLE dbo.[Shipment] (
     POrderID             int NOT NULL,
     CustomsDocRef        nvarchar(100) NULL,
     -- 0 = Pending, 1 = In Transit, 2 = Delivered, and 3 = Failed
-    ShipmentStatus       int NOT NULL DEFAULT 0 CHECK (ShipmentStatus IN (0, 3)),
+    ShipmentStatus       int NOT NULL DEFAULT 0 CHECK (ShipmentStatus BETWEEN 0 AND 3),
     IsLocked             bit NOT NULL DEFAULT 0,
     LockedAt             datetime2 NULL,
     ShipmentDate         date NULL,
@@ -276,32 +258,34 @@ CREATE TABLE dbo.[Batch] (
 --------------------------------------------------------------------------------------------------------------------------------
 
 -- Procedure to assign a random and unique EmployeeNumber or CustomerNumber based on the prefix
-IF OBJECT_ID('dbo.AssignRandomUserNumber', 'P') IS NOT NULL
-    DROP PROCEDURE dbo.AssignRandomUserNumber;
+IF OBJECT_ID('dbo.AssignRandomNumber', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.AssignRandomNumber;
 GO
 
-CREATE PROCEDURE dbo.AssignRandomUserNumber
-    @Prefix      char(1),      -- 'E' for Employee, 'C' for Customer
-    @Id          int,          -- EmployeeID or CustomerID
+CREATE PROCEDURE dbo.AssignRandomNumber
+    @Prefix      char(1),      -- 'E' for Employee, 'C' for Customer, 'P' for Purchase Order, 'S' for Supply Order
+    @Id          int,          -- EmployeeID or CustomerID or OrderID
     @MaxAttempts int = 100
 AS
 BEGIN
     SET NOCOUNT ON;
 
-    DECLARE @UserNumber   char(10);
+    DECLARE @GeneratedNumber   char(10);
     DECLARE @RandomDigits varchar(9);
     DECLARE @Exists       bit = 1;
     DECLARE @Attempts     int = 0;
     DECLARE @TableName    nvarchar(50);
 
-    IF @Prefix NOT IN ('E', 'C')
+    IF @Prefix NOT IN ('E', 'C', 'P', 'S')
     BEGIN
-        RAISERROR('Invalid prefix. Must be ''E'' for Employee or ''C'' for Customer.', 16, 1);
+        RAISERROR('Invalid prefix. Must be ''E'' for Employee, ''C'' for Customer, ''P'' for Purchase Order, or ''S'' for Supply Order.', 16, 1);
         RETURN;
     END
 
     -- Set table name based on prefix
-    SET @TableName = CASE WHEN @Prefix = 'E' THEN 'Employee' ELSE 'Customer' END;
+    SET @TableName = CASE WHEN @Prefix = 'E' THEN 'Employee' 
+                          WHEN @Prefix = 'C' THEN 'Customer' 
+                          WHEN @Prefix = 'P' OR @Prefix = 'S' THEN 'Order' END;
 
     -- Try until we find a unique number or hit the attempt limit
     WHILE @Exists = 1 AND @Attempts < @MaxAttempts
@@ -311,16 +295,22 @@ BEGIN
         -- 9 random digits
         SET @RandomDigits = RIGHT('000000000'
                                   + CAST(ABS(CHECKSUM(NEWID())) % 1000000000 AS varchar(9)), 9);
-        SET @UserNumber = @Prefix + @RandomDigits;
+        -- 10 digit complete number
+        SET @GeneratedNumber = @Prefix + @RandomDigits;
 
         IF @Prefix = 'E'
         BEGIN
-            IF NOT EXISTS (SELECT 1 FROM dbo.[Employee] WHERE EmployeeNumber = @UserNumber)
+            IF NOT EXISTS (SELECT 1 FROM dbo.[Employee] WHERE EmployeeNumber = @GeneratedNumber)
                 SET @Exists = 0;
         END
-        ELSE -- IF @Prefix = 'C'
+        ELSE IF @Prefix = 'C'
         BEGIN
-            IF NOT EXISTS (SELECT 1 FROM dbo.[Customer] WHERE CustomerNumber = @UserNumber)
+            IF NOT EXISTS (SELECT 1 FROM dbo.[Customer] WHERE CustomerNumber = @GeneratedNumber)
+                SET @Exists = 0;
+        END
+        ELSE IF @Prefix = 'P' OR @Prefix = 'S'
+        BEGIN
+            IF NOT EXISTS (SELECT 1 FROM dbo.[Order] WHERE OrderNumber = @GeneratedNumber)
                 SET @Exists = 0;
         END
     END
@@ -335,30 +325,62 @@ BEGIN
     IF @Prefix = 'E'
     BEGIN
         UPDATE dbo.[Employee]
-        SET EmployeeNumber = @UserNumber
+        SET EmployeeNumber = @GeneratedNumber
         WHERE EmployeeID = @Id;
     END
-    ELSE -- IF @Prefix = 'C'
+    ELSE IF @Prefix = 'C'
     BEGIN
         UPDATE dbo.[Customer]
-        SET CustomerNumber = @UserNumber
+        SET CustomerNumber = @GeneratedNumber
         WHERE CustomerID = @Id;
+    END
+    ELSE IF @Prefix = 'P' OR @Prefix = 'S'
+    BEGIN
+        UPDATE dbo.[Order]
+        SET OrderNumber = @GeneratedNumber
+        WHERE OrderID = @Id;
     END
 END;
 GO
 
 --------------------------------------------------------------------------------------------------------------------------------
 
--- Procedure to update User LastUpdatedAt timestamp
-CREATE PROCEDURE dbo.Update_UserLastUpdatedAt
-    @UserID int
+-- Procedure to update LastUpdatedAt timestamp for any table
+CREATE PROCEDURE dbo.Update_LastUpdatedAt
+    @Table nvarchar(50),
+    @ID int,
+    @IDColumn nvarchar(50)
 AS
 BEGIN
     SET NOCOUNT ON;
     
-    UPDATE dbo.[User]
-    SET LastUpdatedAt = sysdatetime()
-    WHERE UserID = @UserID;
+    DECLARE @SQL nvarchar(MAX);
+    SET @SQL = N'UPDATE ' + QUOTENAME('dbo') + N'.' + QUOTENAME(@Table) + N' 
+                 SET LastUpdatedAt = sysdatetime() 
+                 WHERE ' + QUOTENAME(@IDColumn) + N' = @ID';
+    
+    EXEC sp_executesql @SQL, N'@ID int', @ID = @ID;
+END;
+GO
+
+--------------------------------------------------------------------------------------------------------------------------------
+
+-- Procedure to update IsLocked and LockedAt
+CREATE PROCEDURE dbo.Update_IsLocked_LockedAt
+    @Table nvarchar(50),
+    @ID int,
+    @IDColumn nvarchar(50)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    DECLARE @SQL nvarchar(MAX);
+    SET @SQL = N'UPDATE ' + QUOTENAME('dbo') + N'.' + QUOTENAME(@Table) + N' 
+                 SET IsLocked = 1,
+                     LockedAt = sysdatetime()
+                 WHERE ' + QUOTENAME(@IDColumn) + N' = @ID';
+    
+    EXEC sp_executesql @SQL, N'@ID int', @ID = @ID;
 END;
 GO
 
@@ -387,7 +409,7 @@ BEGIN
 
     WHILE @@FETCH_STATUS = 0
     BEGIN
-        EXEC dbo.AssignRandomUserNumber @Prefix = 'E', @Id = @EmployeeID;
+        EXEC dbo.AssignRandomNumber @Prefix = 'E', @Id = @EmployeeID;
         FETCH NEXT FROM employee_cursor INTO @EmployeeID;
     END
 
@@ -419,12 +441,52 @@ BEGIN
 
     WHILE @@FETCH_STATUS = 0
     BEGIN
-        EXEC dbo.AssignRandomUserNumber @Prefix = 'C', @Id = @CustomerID;
+        EXEC dbo.AssignRandomNumber @Prefix = 'C', @Id = @CustomerID;
         FETCH NEXT FROM customer_cursor INTO @CustomerID;
     END
 
     CLOSE customer_cursor;
     DEALLOCATE customer_cursor;
+END;
+GO
+
+--------------------------------------------------------------------------------------------------------------------------------
+
+-- Trigger to auto-generate random and unique OrderNumber on Order insert
+CREATE TRIGGER dbo.trg_GenerateOrderNumber
+ON dbo.[Order]
+AFTER INSERT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    DECLARE @OrderID int;
+    DECLARE @OrderType nvarchar(8);
+    DECLARE @Prefix char(1);
+    
+    DECLARE order_cursor CURSOR FOR
+        SELECT i.OrderID, i.OrderType
+        FROM inserted i
+        INNER JOIN dbo.[Order] o ON i.OrderID = o.OrderID
+        WHERE o.OrderNumber = 'Order00000' OR o.OrderNumber IS NULL;
+
+    OPEN order_cursor;
+    FETCH NEXT FROM order_cursor INTO @OrderID, @OrderType;
+
+    WHILE @@FETCH_STATUS = 0
+    BEGIN
+        SET @Prefix = CASE 
+                        WHEN @OrderType = 'Purchase' THEN 'P' 
+                        WHEN @OrderType = 'Supply' THEN 'S' 
+                        ELSE 'O' -- This should never happen! It is just a fallback
+                    END;
+                    
+        EXEC dbo.AssignRandomNumber @Prefix = @Prefix, @Id = @OrderID;
+        FETCH NEXT FROM order_cursor INTO @OrderID, @OrderType;
+    END
+
+    CLOSE order_cursor;
+    DEALLOCATE order_cursor;
 END;
 GO
 
@@ -438,7 +500,7 @@ AS
 BEGIN
     SET NOCOUNT ON;
     
-    -- Only update following columns were changed
+    -- Only update when the following columns are changed
     -- UserName, ContactEmail, ContactPhone, PasswordHash
     IF EXISTS (
         SELECT 1 FROM inserted i
@@ -450,7 +512,7 @@ BEGIN
     )
     BEGIN
         DECLARE @UserID int = (SELECT UserID FROM inserted);
-        EXEC dbo.Update_UserLastUpdatedAt @UserID = @UserID;
+        EXEC dbo.Update_LastUpdatedAt @Table = 'User', @ID = @UserID, @IDColumn = 'UserID';
     END
 END;
 GO
@@ -465,7 +527,7 @@ AS
 BEGIN
     SET NOCOUNT ON;
     
-    -- Only update following columns were changed
+    -- Only update when the following columns are changed
     -- EmployeeRole, AccessLevel
     IF EXISTS (
         SELECT 1 FROM inserted i
@@ -475,7 +537,7 @@ BEGIN
     )
     BEGIN
         DECLARE @UserID int = (SELECT EmployeeID FROM inserted);
-        EXEC dbo.Update_UserLastUpdatedAt @UserID = @UserID;
+        EXEC dbo.Update_LastUpdatedAt @Table = 'User', @ID = @UserID, @IDColumn = 'UserID';
     END
 END;
 GO
@@ -490,7 +552,7 @@ AS
 BEGIN
     SET NOCOUNT ON;
     
-    -- Only update following columns were changed
+    -- Only update when the following columns are changed
     -- CustomerType, ReliabilityStatus
     IF EXISTS (
         SELECT 1 FROM inserted i
@@ -502,7 +564,166 @@ BEGIN
     )
     BEGIN
         DECLARE @UserID int = (SELECT CustomerID FROM inserted);
-        EXEC dbo.Update_UserLastUpdatedAt @UserID = @UserID;
+        EXEC dbo.Update_LastUpdatedAt @Table = 'User', @ID = @UserID, @IDColumn = 'UserID';
+    END
+END;
+GO
+
+--------------------------------------------------------------------------------------------------------------------------------
+
+-- Trigger to update Order LastUpdatedAt when Order table is updated
+CREATE TRIGGER dbo.trg_Update_OrderLastUpdatedAt
+ON dbo.[Order]
+AFTER UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    -- Only update when the following columns are changed
+    -- OrderStatus, IsApproved, ApprovedBy, IsLocked
+    IF EXISTS (
+        SELECT 1 FROM inserted i
+        INNER JOIN deleted d ON i.OrderID = d.OrderID
+        WHERE (i.OrderStatus <> d.OrderStatus 
+            OR i.IsApproved <> d.IsApproved 
+            OR i.ApprovedBy <> d.ApprovedBy 
+            OR i.IsLocked <> d.IsLocked)
+    )
+    BEGIN
+        DECLARE @OrderID int = (SELECT OrderID FROM inserted);
+        EXEC dbo.Update_LastUpdatedAt @Table = 'Order', @ID = @OrderID, @IDColumn = 'OrderID';
+    END
+END;
+GO
+
+--------------------------------------------------------------------------------------------------------------------------------
+
+-- Trigger to update Shipment LastUpdatedAt when Shipment table is updated
+CREATE TRIGGER dbo.trg_Update_ShipmentLastUpdatedAt
+ON dbo.[Shipment]
+AFTER UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    -- Only update when the following columns are changed
+    -- ShipmentStatus, IsLocked,ActualDeliveryDate
+    IF EXISTS (
+        SELECT 1 FROM inserted i
+        INNER JOIN deleted d ON i.ShipmentID = d.ShipmentID
+        WHERE (i.ShipmentStatus <> d.ShipmentStatus 
+            OR i.IsLocked <> d.IsLocked
+            OR i.ActualDeliveryDate <> d.ActualDeliveryDate)
+    )
+    BEGIN
+        DECLARE @ShipmentID int = (SELECT ShipmentID FROM inserted);
+        EXEC dbo.Update_LastUpdatedAt @Table = 'Shipment', @ID = @ShipmentID, @IDColumn = 'ShipmentID';
+    END
+END;
+GO
+
+--------------------------------------------------------------------------------------------------------------------------------
+
+-- Trigger to update IsLocked and LockedAt when OrderStatus changes to 3 (Delivered) or 4 (Cancelled)
+CREATE TRIGGER dbo.trg_Update_Order_IsLocked_LockedAt
+ON dbo.[Order]
+AFTER UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    -- Only update when the following columns are changed
+    -- OrderStatus
+    IF EXISTS (
+        SELECT 1 FROM inserted i
+        INNER JOIN deleted d ON i.OrderID = d.OrderID
+        WHERE (i.OrderStatus <> d.OrderStatus
+            AND i.OrderStatus IN (3, 4)
+            AND (d.IsLocked = 0 OR d.LockedAt IS NULL))
+    )
+    BEGIN
+        DECLARE @OrderID int = (SELECT OrderID FROM inserted);
+        EXEC dbo.Update_IsLocked_LockedAt @Table = 'Order', @ID = @OrderID, @IDColumn = 'OrderID';
+    END
+END;
+GO
+
+--------------------------------------------------------------------------------------------------------------------------------
+
+-- Trigger to update IsLocked and LockedAt when ShipmentStatus changes to 2 (Delivered) or 3 (Cancelled)
+CREATE TRIGGER dbo.trg_Update_Shipment_IsLocked_LockedAt
+ON dbo.[Shipment]
+AFTER UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    -- Only update when the following columns are changed
+    -- ShipmentStatus
+    IF EXISTS (
+        SELECT 1 FROM inserted i
+        INNER JOIN deleted d ON i.ShipmentID = d.ShipmentID
+        WHERE (i.ShipmentStatus <> d.ShipmentStatus
+            AND i.ShipmentStatus IN (2, 3)
+            AND (d.IsLocked = 0 OR d.LockedAt IS NULL))
+    )
+    BEGIN
+        DECLARE @ShipmentID int = (SELECT ShipmentID FROM inserted);
+        EXEC dbo.Update_IsLocked_LockedAt @Table = 'Shipment', @ID = @ShipmentID, @IDColumn = 'ShipmentID';
+    END
+END;
+GO
+
+--------------------------------------------------------------------------------------------------------------------------------
+
+-- Trigger to prevent updates to Order table with IsLocked = 1
+CREATE TRIGGER dbo.trg_PreventUpdate_Order
+ON dbo.[Order]
+AFTER UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    -- Only prevent updates if the table is locked and the following columns are changed
+    -- OrderStatus, IsApproved, ApprovedBy, IsLocked
+    IF EXISTS (
+        SELECT 1 FROM inserted i
+        INNER JOIN deleted d ON i.OrderID = d.OrderID
+        WHERE d.IsLocked = 1 AND (
+             (i.OrderStatus <> d.OrderStatus) OR
+             (i.IsApproved <> d.IsApproved) OR
+             (i.ApprovedBy <> d.ApprovedBy))
+    )
+    BEGIN
+        ROLLBACK TRANSACTION;
+        RAISERROR('Order table is locked. It cannot be updated.', 16, 1);
+    END
+END;
+GO
+
+--------------------------------------------------------------------------------------------------------------------------------
+
+-- Trigger to prevent updates to Shipment table with IsLocked = 1
+CREATE TRIGGER dbo.trg_PreventUpdate_Shipment
+ON dbo.[Shipment]
+AFTER UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    -- Only prevent updates if the table is locked and the following columns are changed
+    -- ShipmentStatus, IsLocked, ActualDeliveryDate
+    IF EXISTS (
+        SELECT 1 FROM inserted i
+        INNER JOIN deleted d ON i.ShipmentID = d.ShipmentID
+        WHERE d.IsLocked = 1 AND (
+             (i.ShipmentStatus <> d.ShipmentStatus) OR
+             (i.IsLocked <> d.IsLocked) OR
+             (i.ActualDeliveryDate <> d.ActualDeliveryDate))
+    )
+    BEGIN
+        ROLLBACK TRANSACTION;
+        RAISERROR('Shipment table is locked. It cannot be updated.', 16, 1);
     END
 END;
 GO

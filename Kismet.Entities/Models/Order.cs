@@ -21,15 +21,37 @@ namespace Kismet.Entities.Models
         public Customer Customer { get; set; } = null!;
 
         [Required]
-        [Column("OrderDate", TypeName = "date")]
+        [Column("OrderNumber")]
         [DatabaseGenerated(DatabaseGeneratedOption.Computed)]
-        public DateTime OrderDate { get; set; }
+        public string OrderNumber { get; set; } = string.Empty;
+
+        [Required]
+        [Column("OrderType", TypeName = "nvarchar(8)")]
+        public string OrderType { get; set; } = string.Empty;
+
+        [Required]
+        [Column("TotalAmount")]
+        public decimal TotalAmount { get; set; }
 
         [Required]
         [Column("OrderStatus", TypeName = "int")]
         [EnumDataType(typeof(OrderStatus), ErrorMessage = "Invalid order status")]
-        [DatabaseGenerated(DatabaseGeneratedOption.Computed)]
         public OrderStatus OrderStatus { get; set; }
+
+        [Required]
+        [Column("IsApproved")]
+        public bool IsApproved { get; set; }
+
+        [Column("ApprovedBy", TypeName = "int")]
+        [ForeignKey("ApprovingEmployee")]
+        public int? ApprovedBy { get; set; }
+
+        // Navigation property for the 1-to-1 relationship with Employee
+        public Employee? ApprovingEmployee { get; set; }
+
+        [Column("ApprovalDate")]
+        [DatabaseGenerated(DatabaseGeneratedOption.Computed)]
+        public DateTimeOffset? ApprovalDate { get; set; }
 
         [Required]
         [Column("IsLocked")]
@@ -41,16 +63,11 @@ namespace Kismet.Entities.Models
         public DateTimeOffset? LockedAt { get; set; }
 
         [Required]
-        [Column("OrderType", TypeName = "nvarchar(8)")]
-        public string OrderType { get; set; } = string.Empty;
-
-        [Required]
-        [Column("CreatedAt")]
+        [Column("OrderDate")]
         [DatabaseGenerated(DatabaseGeneratedOption.Computed)]
-        public DateTimeOffset CreatedAt { get; set; }
+        public DateTimeOffset OrderDate { get; set; }
 
         [Column("LastUpdatedAt")]
         public DateTimeOffset? LastUpdatedAt { get; set; }
     }
-    
 }

@@ -15,24 +15,6 @@ public class CustomerRepository : ICustomerRepository
     {
         _connectionFactory = connectionFactory;
     }
-
-    // Entity methods (for internal use if needed)
-    public async Task<IReadOnlyList<Customer>> GetAllAsync(CancellationToken cancellationToken = default)
-    {
-        using var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken);
-        var customers = await connection.QueryAsync<Customer>(
-            new CommandDefinition(SqlQueries.Customer.GetAll, cancellationToken: cancellationToken));
-        return customers.ToList().AsReadOnly();
-    }
-
-    public async Task<Customer?> GetByIdAsync(int customerId, CancellationToken cancellationToken = default)
-    {
-        using var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken);
-        return await connection.QueryFirstOrDefaultAsync<Customer>(
-            new CommandDefinition(SqlQueries.Customer.GetById, 
-                new { CustomerID = customerId }, 
-                cancellationToken: cancellationToken));
-    }
     
     /// <summary>
     /// Get all customers

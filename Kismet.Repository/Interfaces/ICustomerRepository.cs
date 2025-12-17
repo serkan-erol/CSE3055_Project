@@ -8,10 +8,6 @@ namespace Kismet.Repository.Interfaces;
 
 public interface ICustomerRepository
 {
-    // Entity methods. These are not exposed in the controller!!!
-    Task<IReadOnlyList<Customer>> GetAllAsync(CancellationToken cancellationToken = default);
-    Task<Customer?> GetByIdAsync(int customerId, CancellationToken cancellationToken = default);
-    
     // DTO methods, using DTOs with raw SQL queries
     Task<IReadOnlyList<CustomerResponseDto>> GetAllDtoAsync(CancellationToken cancellationToken = default);
     Task<CustomerResponseDto?> GetByIdDtoAsync(int customerId, CancellationToken cancellationToken = default);

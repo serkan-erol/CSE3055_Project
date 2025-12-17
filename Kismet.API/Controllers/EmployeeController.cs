@@ -24,6 +24,11 @@ public class EmployeeController : ControllerBase
         try
         {
             var employees = await _employeeRepository.GetAllDtoAsync(cancellationToken);
+
+            if (employees.Count == 0)
+            {
+                return NotFound(new { error = "No employees found" });
+            }
             return Ok(employees);
         }
         catch (Exception ex)

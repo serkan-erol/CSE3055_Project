@@ -15,24 +15,6 @@ public class UserRepository : IUserRepository
     {
         _connectionFactory = connectionFactory;
     }
-
-    // Entity methods (for internal use if needed)
-    public async Task<IReadOnlyList<User>> GetAllAsync(CancellationToken cancellationToken = default)
-    {
-        using var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken);
-        var users = await connection.QueryAsync<User>(
-            new CommandDefinition(SqlQueries.User.GetAll, cancellationToken: cancellationToken));
-        return users.ToList().AsReadOnly();
-    }
-
-    public async Task<User?> GetByIdAsync(int userId, CancellationToken cancellationToken = default)
-    {
-        using var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken);
-        return await connection.QueryFirstOrDefaultAsync<User>(
-            new CommandDefinition(SqlQueries.User.GetById, 
-                new { UserID = userId }, 
-                cancellationToken: cancellationToken));
-    }
     
     /// <summary>
     /// Get all users

@@ -1,0 +1,391 @@
+using Kismet.Entities.DTOs;
+using Kismet.Entities.Models;
+using Kismet.Repository.Interfaces;
+using Microsoft.AspNetCore.Mvc;
+
+namespace Kismet.API.Controllers;
+
+[ApiController]
+[Route("api/[controller]")]
+public class OrderController : ControllerBase
+{
+    private readonly IOrderRepository _orderRepository;
+    private readonly ICustomerRepository _customerRepository;
+    private readonly IEmployeeRepository _employeeRepository;
+
+    public OrderController(IOrderRepository orderRepository, 
+                           ICustomerRepository customerRepository,
+                           IEmployeeRepository employeeRepository)
+    {
+        _orderRepository = orderRepository;
+        _customerRepository = customerRepository;
+        _employeeRepository = employeeRepository;
+    }
+
+    /// <summary>
+    /// Get all orders of a customer to be seen by the customer
+    /// </summary>
+    [HttpGet("{customerId:int}/all-orders/for-customers")]
+    public async Task<IActionResult> GetAllForCustomerAsync(int customerId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            // Check if customer exists
+            var customer = await _customerRepository.GetByIdDtoAsync(customerId, cancellationToken);
+            if (customer is null)
+            {
+                return NotFound(new { error = "Customer not found" });
+            }
+
+            // Get all orders for the customer
+            var orders = await _orderRepository.GetOrderForCustomerAsync(customerId, cancellationToken);
+            
+            // Check if no orders found
+            if (orders.Count == 0)
+            {
+                return NotFound(new { error = "No orders found" });
+            }
+
+            // Return the orders
+            return Ok(orders);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Get all orders for employees to see
+    /// </summary>
+    [HttpGet("all-orders/for-employees")]
+    public async Task<IActionResult> GetAllForEmployeeAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            // Get all orders for the employees
+            var orders = await _orderRepository.GetOrderForEmployeeAsync(cancellationToken);
+            
+            // Check if no orders found
+            if (orders.Count == 0)
+            {
+                return NotFound(new { error = "No orders found" });
+            }
+
+            // Return the orders
+            return Ok(orders);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Get order by ID for a customer to be seen by the customer
+    /// </summary>
+    [HttpGet("{orderId:int}/{customerId:int}/order-by-id/for-customers")]
+    public async Task<IActionResult> GetOrderByIdForCustomerAsync(int orderId, int customerId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            // Check if customer exists
+            var customer = await _customerRepository.GetByIdDtoAsync(customerId, cancellationToken);
+            if (customer is null)
+            {
+                return NotFound(new { error = "Customer not found" });
+            }
+            
+            // Get the order by ID for the customer
+            var order = await _orderRepository.GetOrderByOrderIdForCustomerAsync(orderId, customerId, cancellationToken);
+            
+            // Check if order not found
+            if (order is null)
+            {
+                return NotFound(new { error = "Order not found" });
+            }
+
+            // Return the order
+            return Ok(order);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+    
+    /// <summary>
+    /// Get order by ID for employees to see
+    /// </summary>
+    [HttpGet("{orderId:int}/order-by-id/for-employees")]
+    public async Task<IActionResult> GetOrderByOrderIdForEmployeeAsync(int orderId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            // Get the order by ID
+            var order = await _orderRepository.GetOrderByOrderIdForEmployeeAsync(orderId, cancellationToken);
+            
+            // Check if order not found
+            if (order is null)
+            {
+                return NotFound(new { error = "Order not found" });
+            }
+
+            // Return the order
+            return Ok(order);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Get order by Customer ID for employees to see
+    /// </summary>
+    [HttpGet("{customerId:int}/order-by-customer-id/for-employees")]
+    public async Task<IActionResult> GetOrderByCustomerIdForEmployeeAsync(int customerId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            // Check if the customer exists
+            var customer = await _customerRepository.GetByIdDtoAsync(customerId, cancellationToken);
+            if (customer is null)
+            {
+                return NotFound(new { error = "Customer not found" });
+            }
+
+            // Get the order by Customer ID
+            var orders = await _orderRepository.GetOrderByCustomerIdForEmployeeAsync(customerId, cancellationToken);
+            
+            // Check if no orders found
+            if (orders.Count == 0)
+            {
+                return NotFound(new { error = "No orders found" });
+            }
+
+            return Ok(orders);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Create a new order for a customer
+    /// </summary>
+    [HttpPost("{customerId:int}/create-order")]
+    public async Task<IActionResult> CreateOrderAsync(int customerId, [FromBody] CreateOrderDto dto, CancellationToken cancellationToken)
+    {
+        try
+        {
+            // Check if model state is valid
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            // Check if the customer exists before creating the order
+            var customer = await _customerRepository.GetByIdDtoAsync(customerId, cancellationToken);
+            if (customer is null)
+            {
+                return NotFound(new { error = "Customer not found" });
+            }
+
+            // Set the customer ID
+            dto.CustomerID = customerId;
+
+            // Create the order
+            var order = await _orderRepository.CreateOrderAsync(dto, cancellationToken);
+
+            // Return the order
+            return Ok(order);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Status update for an order by an employee
+    /// </summary>
+    [HttpPut("{employeeId:int}/update-order-status/")]
+    public async Task<IActionResult> UpdateOrderStatusAsync(int employeeId, [FromBody] UpdateOrderStatusDto dto, CancellationToken cancellationToken)
+    {
+        try
+        {
+            // Check if model state is valid
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            // Check if the employee exists
+            var employee = await _employeeRepository.GetByIdDtoAsync(employeeId, cancellationToken);
+            if (employee is null)
+            {
+                return NotFound(new { error = "Employee not found" });
+            }
+            // Check if the order exists
+            var order = await _orderRepository.GetOrderByOrderIdForEmployeeAsync(dto.OrderID, cancellationToken);
+            if (order is null)
+            {
+                return NotFound(new { error = "Order not found" });
+            }
+
+            // Check if the order is currently locked
+            // Redundant check, since the DB trigger will prevent updates if the order is locked
+            //aaa var isLocked = await _orderRepository.CheckIfOrderIsLockedAsync(dto.OrderID, cancellationToken);
+            // if (isLocked)
+            // {
+            //    return BadRequest(new { error = "Order is locked. It cannot be updated." });
+            // }
+
+            // OrderStatus checks to see if it is valid
+
+            // This should never happen, this is a fallback. We must use the approve-order endpoint to approve an order.
+            // Check if the new order status is approved
+            if (dto.OrderStatus == OrderStatus.Approved)
+            {
+                return BadRequest(new { error = "Use approve-order endpoint to approve an order." });
+            }
+
+            // Check if the order is approved before updating the order status
+            if (!order.IsApproved)
+            {
+                return BadRequest(new { error = "Order is not approved. It cannot be updated." });
+            }
+            
+            // This should never happen, this is a fallback
+            // Check if the order is already completed but if we are here, IsLocked is false!!!
+            // Redundant check, since the DB trigger will prevent updates if the order is locked
+            //aaa if (order.OrderStatus >= OrderStatus.Delivered)
+            // {
+            //    return BadRequest(new { error = "Order is already completed. It cannot be updated. Check the order's IsLocked status!" });
+            // }
+
+            // Check if the new order status is the same or less than the current order status
+            if (dto.OrderStatus <= order.OrderStatus)
+            {
+                return BadRequest(new { error = "New order status is the same or less than the current order status." });
+            }
+
+            // Update the order status
+            var updatedOrder = await _orderRepository.UpdateOrderStatusAsync(dto, cancellationToken);
+
+            // Return the order
+            return Ok(updatedOrder);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Approve an order
+    /// </summary>
+    [HttpPut("{employeeId:int}/approve-order/")]
+    public async Task<IActionResult> ApproveOrderAsync(int employeeId, [FromBody] ApproveOrderDto dto, CancellationToken cancellationToken)
+    {
+        try
+        {
+            // Check if model state is valid
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            // Check if the employee exists
+            var employee = await _employeeRepository.GetByIdDtoAsync(employeeId, cancellationToken);
+            if (employee is null)
+            {
+                return NotFound(new { error = "Employee not found" });
+            }
+
+            // Check if the order exists
+            var order = await _orderRepository.GetOrderByOrderIdForEmployeeAsync(dto.OrderID, cancellationToken);
+            if (order is null)
+            {
+                return NotFound(new { error = "Order not found" });
+            }
+
+            // Check if the order status is pending
+            var orderStatus = await _orderRepository.GetOrderStatusByIdAsync(dto.OrderID, cancellationToken);
+            if (orderStatus != OrderStatus.Pending)
+            {
+                return BadRequest(new { error = "Order is not pending. It cannot be approved." });
+            }
+
+            // Set the ApprovedBy to the EmployeeID
+            dto.ApprovedBy = employeeId;
+
+            // Approve the order
+            var approvedOrder = await _orderRepository.ApproveOrderAsync(dto, cancellationToken);
+
+            // Return the approved order
+            return Ok(approvedOrder);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Get order status by ID
+    /// </summary>
+    [HttpGet("{orderId:int}/get-order-status/")]
+    public async Task<IActionResult> GetOrderStatusByIdAsync(int orderId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            // Check if the order exists
+            var order = await _orderRepository.GetOrderByOrderIdForEmployeeAsync(orderId, cancellationToken);
+            if (order is null)
+            {
+                return NotFound(new { error = "Order not found" });
+            }
+
+            // Get the order status by ID
+            var orderStatus = await _orderRepository.GetOrderStatusByIdAsync(orderId, cancellationToken);
+            
+            // Return the order status
+            return Ok(orderStatus);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+
+    /// <summary>
+    /// Check if an order is locked
+    /// </summary>
+    [HttpGet("{orderId:int}/check-if-locked/")]
+    public async Task<IActionResult> CheckIfOrderIsLockedAsync(int orderId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            // Check if the order exists
+            var order = await _orderRepository.GetOrderByOrderIdForEmployeeAsync(orderId, cancellationToken);
+            if (order is null)
+            {
+                return NotFound(new { error = "Order not found" });
+            }
+
+            // Check if the order is locked
+            var isLocked = await _orderRepository.CheckIfOrderIsLockedAsync(orderId, cancellationToken);
+
+            // Return the result
+            return Ok(isLocked);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+}
