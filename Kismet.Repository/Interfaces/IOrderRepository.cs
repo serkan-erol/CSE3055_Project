@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Kismet.Entities.DTOs;
-using Kismet.Entities.Models;
+using Kismet.Entities.Enums;
 
 namespace Kismet.Repository.Interfaces;
 
@@ -17,5 +17,6 @@ public interface IOrderRepository
     Task<OrderResponseToEmployeeDto> UpdateOrderStatusAsync(UpdateOrderStatusDto dto, CancellationToken cancellationToken = default);
     Task<OrderResponseToEmployeeDto> ApproveOrderAsync(ApproveOrderDto dto, CancellationToken cancellationToken = default);
     Task<OrderStatus> GetOrderStatusByIdAsync(int orderId, CancellationToken cancellationToken = default);
+    Task<string> GetOrderStatusDisplayNameByIdAsync(int orderId, CancellationToken cancellationToken = default);
     Task<bool> CheckIfOrderIsLockedAsync(int orderId, CancellationToken cancellationToken = default);
 }

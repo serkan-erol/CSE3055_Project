@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
-using Kismet.Entities.Models;
+using Kismet.Entities.Enums;
 
 namespace Kismet.Entities.DTOs;
 
@@ -13,7 +13,7 @@ public class OrderResponseToCustomerDto
     public string OrderType { get; set; } = string.Empty;
     public decimal TotalAmount { get; set; }
     public OrderStatus OrderStatus { get; set; }
-    public DateTime OrderDate { get; set; }
+    public DateTimeOffset OrderDate { get; set; }
     public DateTimeOffset? LastUpdatedAt { get; set; }
 }
 

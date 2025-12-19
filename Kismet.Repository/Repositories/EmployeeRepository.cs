@@ -25,7 +25,9 @@ public class EmployeeRepository : IEmployeeRepository
         
         // Dapper maps SQL result columns to DTO properties by name (case-insensitive)
         var employees = await connection.QueryAsync<EmployeeResponseDto>(
-            new CommandDefinition(SqlQueries.Employee.GetAllDto, cancellationToken: cancellationToken));
+            
+            // No parameters needed
+            new CommandDefinition(SqlQueries.Employee.GetEmployeeBase, cancellationToken: cancellationToken));
         
         return employees.ToList().AsReadOnly();
     }
@@ -39,13 +41,14 @@ public class EmployeeRepository : IEmployeeRepository
         
         // Dapper maps the SQL result to EmployeeResponseDto  
         return await connection.QueryFirstOrDefaultAsync<EmployeeResponseDto>(
-            new CommandDefinition(SqlQueries.Employee.GetByIdDto, 
+            // Build the query dynamically based on the parameters
+            new CommandDefinition(SqlQueries.Employee.GetEmployeeBase + " WHERE e.EmployeeID = @EmployeeID", 
                 new { EmployeeID = employeeId }, 
                 cancellationToken: cancellationToken));
     }
-
+    
     /// <summary>
-    /// Create a new employee from DTO - Dapper maps DTO properties to SQL parameters
+    /// Create a new employee
     /// </summary>
     public async Task<EmployeeResponseDto> CreateAsync(CreateEmployeeDto dto, CancellationToken cancellationToken = default)
     {
@@ -54,9 +57,16 @@ public class EmployeeRepository : IEmployeeRepository
 
         try
         {
-            // Insert User (super-type) - Dapper maps DTO properties to SQL parameters
+            // Insert User (super-type) - create anonymous object from DTO + required UserType value
             var userId = await connection.QuerySingleAsync<int>(
-                new CommandDefinition(SqlQueries.User.InsertEmployeeUser, dto, 
+                new CommandDefinition(SqlQueries.User.InsertUser, new
+                {
+                    dto.UserName,
+                    dto.ContactEmail,
+                    dto.ContactPhone,
+                    dto.PasswordHash,
+                    UserType = "Employee"
+                }, 
                     transaction, cancellationToken: cancellationToken));
 
             // Insert Employee (sub-type) - create anonymous object from DTO + generated values

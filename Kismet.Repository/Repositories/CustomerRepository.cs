@@ -25,7 +25,9 @@ public class CustomerRepository : ICustomerRepository
         
         // Dapper maps SQL result columns to DTO properties by name (case-insensitive)
         var customers = await connection.QueryAsync<CustomerResponseDto>(
-            new CommandDefinition(SqlQueries.Customer.GetAllDto, cancellationToken: cancellationToken));
+            // Build the query dynamically based on the parameters
+            new CommandDefinition(SqlQueries.Customer.GetCustomerBase + " ORDER BY c.CustomerID", 
+                cancellationToken: cancellationToken));
         
         return customers.ToList().AsReadOnly();
     }
@@ -39,13 +41,15 @@ public class CustomerRepository : ICustomerRepository
         
         // Dapper maps the SQL result to CustomerResponseDto
         return await connection.QueryFirstOrDefaultAsync<CustomerResponseDto>(
-            new CommandDefinition(SqlQueries.Customer.GetByIdDto, 
+            
+            // Build the query dynamically based on the parameters
+            new CommandDefinition(SqlQueries.Customer.GetCustomerBase + " WHERE c.CustomerID = @CustomerID", 
                 new { CustomerID = customerId }, 
                 cancellationToken: cancellationToken));
     }
 
     /// <summary>
-    /// Create a new customer from DTO - Dapper maps DTO properties to SQL parameters
+    /// Create a new customer
     /// </summary>
     public async Task<CustomerResponseDto> CreateAsync(CreateCustomerDto dto, CancellationToken cancellationToken = default)
     {
@@ -54,9 +58,16 @@ public class CustomerRepository : ICustomerRepository
 
         try
         {
-            // Insert User (super-type) - Dapper maps DTO properties to SQL parameters
+            // Insert User (super-type) - create anonymous object from DTO + required UserType value
             var userId = await connection.QuerySingleAsync<int>(
-                new CommandDefinition(SqlQueries.User.InsertCustomerUser, dto, 
+                new CommandDefinition(SqlQueries.User.InsertUser, new
+                {
+                    dto.UserName,
+                    dto.ContactEmail,
+                    dto.ContactPhone,
+                    dto.PasswordHash,
+                    UserType = "Customer"
+                }, 
                     transaction, cancellationToken: cancellationToken));
 
             // Insert Customer (sub-type) - create anonymous object from DTO + generated values
@@ -172,4 +183,3 @@ public class CustomerRepository : ICustomerRepository
         }
     }
 }
-

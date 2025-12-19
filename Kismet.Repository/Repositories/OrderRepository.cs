@@ -1,7 +1,7 @@
 using Dapper;
 using Kismet.Core.Data;
 using Kismet.Entities.DTOs;
-using Kismet.Entities.Models;
+using Kismet.Entities.Enums;
 using Kismet.Repository.Helpers;
 using Kismet.Repository.Interfaces;
 
@@ -18,60 +18,90 @@ public class OrderRepository : IOrderRepository
         _customerRepository = customerRepository;
     }
 
+    /// <summary>
+    /// Get all orders for a customer
+    /// </summary>
     public async Task<IReadOnlyList<OrderResponseToCustomerDto>> GetOrderForCustomerAsync(int customerId, CancellationToken cancellationToken = default)
     {
         using var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken);
+
+        // Build the query dynamically based on the parameters
+        var query = SqlQueries.Order.GetOrderBaseForCustomer + " WHERE o.CustomerID = @CustomerID ORDER BY o.OrderID";
+
+        // Execute the query and return the orders
         var orders = await connection.QueryAsync<OrderResponseToCustomerDto>(
-            new CommandDefinition(SqlQueries.Order.GetOrderForCustomer, 
+            new CommandDefinition(query, 
                 new { CustomerID = customerId }, 
                 cancellationToken: cancellationToken));
         return orders.ToList().AsReadOnly();
     }
 
-    // DTO methods, using DTOs with raw SQL queries
+    /// <summary>
+    /// Get ALL orders for employees to see
+    /// </summary>
     public async Task<IReadOnlyList<OrderResponseToEmployeeDto>> GetOrderForEmployeeAsync(CancellationToken cancellationToken = default)
     {
         using var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken);
+
+        // Build the query dynamically based on the parameters
+        var query = SqlQueries.Order.GetOrderBaseForEmployee + " ORDER BY o.OrderID";
+
+        // Execute the query and return the orders
         var orders = await connection.QueryAsync<OrderResponseToEmployeeDto>(
-            new CommandDefinition(SqlQueries.Order.GetOrderForEmployee, cancellationToken: cancellationToken));
+            new CommandDefinition(query, cancellationToken: cancellationToken));
         return orders.ToList().AsReadOnly();
     }
 
     /// <summary>
-    /// Get an order by ID for a customer
+    /// Get an order by ID for a customer to see
     /// </summary>
     public async Task<OrderResponseToCustomerDto> GetOrderByOrderIdForCustomerAsync(int orderId, int customerId, CancellationToken cancellationToken = default)
     {
         using var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken);
+
+        // Build the query dynamically based on the parameters
+        var query = SqlQueries.Order.GetOrderBaseForCustomer + " WHERE o.OrderID = @OrderID AND o.CustomerID = @CustomerID";
+
+        // Execute the query and return the order
         var order = await connection.QuerySingleOrDefaultAsync<OrderResponseToCustomerDto>(
-            new CommandDefinition(SqlQueries.Order.GetOrderByOrderIdForCustomer, new { OrderID = orderId, CustomerID = customerId }, cancellationToken: cancellationToken));
+            new CommandDefinition(query, new { OrderID = orderId, CustomerID = customerId }, cancellationToken: cancellationToken));
         return order ?? throw new InvalidOperationException("Order not found");
     }
 
     /// <summary>
-    /// Get an order by ID for an employee
+    /// Get an order by ID for an employee to see
     /// </summary>
     public async Task<OrderResponseToEmployeeDto> GetOrderByOrderIdForEmployeeAsync(int orderId, CancellationToken cancellationToken = default)
     {
         using var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken);
+
+        // Build the query dynamically based on the parameters
+        var query = SqlQueries.Order.GetOrderBaseForEmployee + " WHERE o.OrderID = @OrderID";
+
+        // Execute the query and return the order
         var order = await connection.QuerySingleOrDefaultAsync<OrderResponseToEmployeeDto>(
-            new CommandDefinition(SqlQueries.Order.GetOrderByOrderIdForEmployee, new { OrderID = orderId }, cancellationToken: cancellationToken));
+            new CommandDefinition(query, new { OrderID = orderId }, cancellationToken: cancellationToken));
         return order ?? throw new InvalidOperationException("Order not found");
     }
 
     /// <summary>
-    /// Get an order by Customer ID for an employee
+    /// Get an order by Customer ID for an employee to see
     /// </summary>
     public async Task<IReadOnlyList<OrderResponseToEmployeeDto>> GetOrderByCustomerIdForEmployeeAsync(int customerId, CancellationToken cancellationToken = default)
     {
         using var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken);
+
+        // Build the query dynamically based on the parameters
+        var query = SqlQueries.Order.GetOrderBaseForEmployee + " WHERE o.CustomerID = @CustomerID ORDER BY o.OrderID";
+
+        // Execute the query and return the orders
         var orders = await connection.QueryAsync<OrderResponseToEmployeeDto>(
-            new CommandDefinition(SqlQueries.Order.GetOrderByCustomerIdForEmployee, new { CustomerID = customerId }, cancellationToken: cancellationToken));
+            new CommandDefinition(query, new { CustomerID = customerId }, cancellationToken: cancellationToken));
         return orders.ToList().AsReadOnly();
     }
     
     /// <summary>
-    /// Create a new order
+    /// Create a new order for a customer
     /// </summary>
     public async Task<OrderResponseToCustomerDto> CreateOrderAsync(CreateOrderDto dto, CancellationToken cancellationToken = default)
     {
@@ -99,7 +129,7 @@ public class OrderRepository : IOrderRepository
     }
 
     /// <summary>
-    /// Approve an order
+    /// Approve an order (only employees can approve orders)
     /// </summary>
     public async Task<OrderResponseToEmployeeDto> ApproveOrderAsync(ApproveOrderDto dto, CancellationToken cancellationToken = default)
     {
@@ -126,7 +156,15 @@ public class OrderRepository : IOrderRepository
     }
 
     /// <summary>
-    /// Check if an order is locked for updates
+    /// Get the display name of an order status by ID
+    /// </summary>
+    public async Task<string> GetOrderStatusDisplayNameByIdAsync(int orderId, CancellationToken cancellationToken = default)
+    {
+        var orderStatus = await GetOrderStatusByIdAsync(orderId, cancellationToken);
+        return orderStatus.GetDisplayName();
+    }
+
+    /// Check if an order is locked for updates (only employees can check if an order is locked)
     /// </summary>
     public async Task<bool> CheckIfOrderIsLockedAsync(int orderId, CancellationToken cancellationToken = default)
     {

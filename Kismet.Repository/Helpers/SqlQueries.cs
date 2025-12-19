@@ -35,39 +35,37 @@ public static class SqlQueries
             FROM dbo.[User] u
             WHERE u.UserID = @UserID";
 
-        public const string InsertCustomerUser = @"
+        public const string InsertUser = @"
             INSERT INTO dbo.[User] (UserName, ContactEmail, ContactPhone, PasswordHash, UserType)
-            VALUES (@UserName, @ContactEmail, @ContactPhone, @PasswordHash, 'Customer');
-            SELECT CAST(SCOPE_IDENTITY() as int);";
-
-        public const string InsertEmployeeUser = @"
-            INSERT INTO dbo.[User] (UserName, ContactEmail, ContactPhone, PasswordHash, UserType)
-            VALUES (@UserName, @ContactEmail, @ContactPhone, @PasswordHash, 'Employee');
+            VALUES (@UserName, @ContactEmail, @ContactPhone, @PasswordHash, @UserType);
             SELECT CAST(SCOPE_IDENTITY() as int);";
 
         public const string UpdateUserName = @"
             UPDATE dbo.[User]
             SET 
-                UserName = COALESCE(@UserName, UserName)
+                UserName = COALESCE(@UserName, UserName),
+                LastUpdatedAt = sysdatetime()
             WHERE UserID = @UserID";
 
         public const string UpdateUserEmail = @"
             UPDATE dbo.[User]
             SET 
-                ContactEmail = COALESCE(@ContactEmail, ContactEmail)
+                ContactEmail = COALESCE(@ContactEmail, ContactEmail),
+                LastUpdatedAt = sysdatetime()
             WHERE UserID = @UserID";
 
         public const string UpdateUserPhone = @"
             UPDATE dbo.[User]
             SET 
-                ContactPhone = COALESCE(@ContactPhone, ContactPhone)
+                ContactPhone = COALESCE(@ContactPhone, ContactPhone),
+                LastUpdatedAt = sysdatetime()
             WHERE UserID = @UserID";
 
         public const string UpdateUserPassword = @"
             UPDATE dbo.[User]
             SET 
-                PasswordHash = COALESCE(@PasswordHash, PasswordHash)
-
+                PasswordHash = COALESCE(@PasswordHash, PasswordHash),
+                LastUpdatedAt = sysdatetime()
             WHERE UserID = @UserID";
 
         public const string DeleteUser = "DELETE FROM dbo.[User] WHERE UserID = @UserID";
@@ -79,7 +77,7 @@ public static class SqlQueries
     public static class Customer
     {
         // Query for CustomerResponseDto (includes User fields)
-        public const string GetAllDto = @"
+        public const string GetCustomerBase = @"
             SELECT 
                 c.CustomerID,
                 c.CustomerNumber,
@@ -91,23 +89,7 @@ public static class SqlQueries
                 u.CreatedAt,
                 u.LastUpdatedAt
             FROM dbo.[Customer] c
-            INNER JOIN dbo.[User] u ON u.UserID = c.CustomerID AND u.UserType = c.UserType
-            ORDER BY c.CustomerID";
-
-        public const string GetByIdDto = @"
-            SELECT 
-                c.CustomerID,
-                c.CustomerNumber,
-                c.CustomerType,
-                c.ReliabilityStatus,
-                u.UserName,
-                u.ContactEmail,
-                u.ContactPhone,
-                u.CreatedAt,
-                u.LastUpdatedAt
-            FROM dbo.[Customer] c
-            INNER JOIN dbo.[User] u ON u.UserID = c.CustomerID AND u.UserType = c.UserType
-            WHERE c.CustomerID = @CustomerID";
+            INNER JOIN dbo.[User] u ON u.UserID = c.CustomerID AND u.UserType = c.UserType";
 
         public const string InsertCustomer = @"
             INSERT INTO dbo.[Customer] (CustomerID, CustomerType, ReliabilityStatus)
@@ -117,13 +99,15 @@ public static class SqlQueries
             UPDATE dbo.[Customer]
             SET 
                 CustomerType = COALESCE(@CustomerType, CustomerType)
-            WHERE CustomerID = @CustomerID";
+            WHERE CustomerID = @CustomerID
+            EXEC dbo.Update_LastUpdatedAt @Table = 'User', @ID = @CustomerID, @IDColumn = 'UserID';";
 
         public const string UpdateCustomerReliability = @"
             UPDATE dbo.[Customer]
             SET 
                 ReliabilityStatus = COALESCE(@ReliabilityStatus, ReliabilityStatus)
-            WHERE CustomerID = @CustomerID";
+            WHERE CustomerID = @CustomerID
+            EXEC dbo.Update_LastUpdatedAt @Table = 'User', @ID = @CustomerID, @IDColumn = 'UserID';";
 
         public const string DeleteCustomer = "DELETE FROM dbo.[Customer] WHERE CustomerID = @CustomerID";
     }
@@ -134,7 +118,7 @@ public static class SqlQueries
     public static class Employee
     {
         // Query for EmployeeResponseDto (includes User fields)
-        public const string GetAllDto = @"
+        public const string GetEmployeeBase = @"
             SELECT 
                 e.EmployeeID,
                 e.EmployeeNumber,
@@ -149,21 +133,6 @@ public static class SqlQueries
             INNER JOIN dbo.[User] u ON u.UserID = e.EmployeeID AND u.UserType = e.UserType
             ORDER BY e.EmployeeID";
 
-        public const string GetByIdDto = @"
-            SELECT 
-                e.EmployeeID,
-                e.EmployeeNumber,
-                e.EmployeeRole,
-                e.AccessLevel,
-                u.UserName,
-                u.ContactEmail,
-                u.ContactPhone,
-                u.CreatedAt,
-                u.LastUpdatedAt
-            FROM dbo.[Employee] e
-            INNER JOIN dbo.[User] u ON u.UserID = e.EmployeeID AND u.UserType = e.UserType
-            WHERE e.EmployeeID = @EmployeeID";
-
         public const string InsertEmployee = @"
             INSERT INTO dbo.[Employee] (EmployeeID, EmployeeRole, AccessLevel)
             VALUES (@EmployeeID, @EmployeeRole, @AccessLevel);";
@@ -172,13 +141,15 @@ public static class SqlQueries
             UPDATE dbo.[Employee]
             SET 
                 EmployeeRole = COALESCE(@EmployeeRole, EmployeeRole)
-            WHERE EmployeeID = @EmployeeID";
+            WHERE EmployeeID = @EmployeeID
+            EXEC dbo.Update_LastUpdatedAt @Table = 'User', @ID = @EmployeeID, @IDColumn = 'UserID';";
 
         public const string UpdateEmployeeAccessLevel = @"
             UPDATE dbo.[Employee]
             SET 
                 AccessLevel = COALESCE(@AccessLevel, AccessLevel)
-            WHERE EmployeeID = @EmployeeID";
+            WHERE EmployeeID = @EmployeeID
+            EXEC dbo.Update_LastUpdatedAt @Table = 'User', @ID = @EmployeeID, @IDColumn = 'UserID';";
 
         public const string DeleteEmployee = "DELETE FROM dbo.[Employee] WHERE EmployeeID = @EmployeeID";
     }
@@ -188,8 +159,8 @@ public static class SqlQueries
     /// </summary>
     public static class Order
     {
-        // Query for all orders of a customer to be seen by the customer
-        public const string GetOrderForCustomer = @"
+        // Base query for orders to be seen by customers (simpler fields, no join)
+        public const string GetOrderBaseForCustomer = @"
             SELECT 
                 o.OrderNumber,
                 o.OrderType,
@@ -197,14 +168,10 @@ public static class SqlQueries
                 o.OrderStatus,
                 o.OrderDate,
                 o.LastUpdatedAt
-            FROM dbo.[Order] o
-            WHERE o.CustomerID = @CustomerID
-            ORDER BY o.OrderID";
+            FROM dbo.[Order] o";
 
-        // Query for OrderResponseToEmployeeDto. This brings ALL THE ORDERS!!!
-        // And some related Customer data
-        // To be seen by an employee
-        public const string GetOrderForEmployee = @"
+        // Base query for orders to be seen by employees (more fields, includes Customer join)
+        public const string GetOrderBaseForEmployee = @"
             SELECT 
                 o.OrderID,
                 c.CustomerID,
@@ -221,62 +188,7 @@ public static class SqlQueries
                 o.OrderDate,
                 o.LastUpdatedAt
             FROM dbo.[Order] o
-            INNER JOIN dbo.[Customer] c ON c.CustomerID = o.CustomerID AND c.UserType = 'Customer'
-            ORDER BY o.OrderID";
-
-        // Query for a specific order of a customer to be seen by the customer
-        public const string GetOrderByOrderIdForCustomer = @"
-            SELECT 
-                o.OrderNumber,
-                o.OrderType,
-                o.TotalAmount,
-                o.OrderStatus,
-                o.OrderDate,
-                o.LastUpdatedAt
-            FROM dbo.[Order] o
-            WHERE o.OrderID = @OrderID AND o.CustomerID = @CustomerID";
-
-        // Query for a specific order to be seen by an employee
-        public const string GetOrderByOrderIdForEmployee = @"
-            SELECT 
-                o.OrderID,
-                c.CustomerID,
-                c.ReliabilityStatus,
-                o.OrderNumber,
-                o.OrderType,
-                o.TotalAmount,
-                o.OrderStatus,
-                o.IsApproved,
-                o.ApprovedBy,
-                o.ApprovalDate,
-                o.IsLocked,
-                o.LockedAt,
-                o.OrderDate,
-                o.LastUpdatedAt
-            FROM dbo.[Order] o
-            INNER JOIN dbo.[Customer] c ON c.CustomerID = o.CustomerID AND c.UserType = 'Customer'
-            WHERE o.OrderID = @OrderID";
-
-        // Query for a specific order to be seen by an employee
-        public const string GetOrderByCustomerIdForEmployee = @"
-            SELECT 
-                o.OrderID,
-                c.CustomerID,
-                c.ReliabilityStatus,
-                o.OrderNumber,
-                o.OrderType,
-                o.TotalAmount,
-                o.OrderStatus,
-                o.IsApproved,
-                o.ApprovedBy,
-                o.ApprovalDate,
-                o.IsLocked,
-                o.LockedAt,
-                o.OrderDate,
-                o.LastUpdatedAt
-            FROM dbo.[Order] o
-            INNER JOIN dbo.[Customer] c ON c.CustomerID = o.CustomerID AND c.UserType = 'Customer'
-            WHERE o.CustomerID = @CustomerID";
+            INNER JOIN dbo.[Customer] c ON c.CustomerID = o.CustomerID AND c.UserType = 'Customer'";
 
         // Query for creating a new order
         public const string InsertOrder = @"
@@ -289,7 +201,8 @@ public static class SqlQueries
             UPDATE dbo.[Order]
             SET 
                 OrderStatus = COALESCE(@OrderStatus, OrderStatus)
-            WHERE OrderID = @OrderID";
+            WHERE OrderID = @OrderID
+            EXEC dbo.Update_LastUpdatedAt @Table = 'Order', @ID = @OrderID, @IDColumn = 'OrderID';";
 
         // Query for approving an order
         public const string ApproveOrder = @"
@@ -299,7 +212,8 @@ public static class SqlQueries
                 IsApproved = 1,
                 ApprovedBy = @ApprovedBy,
                 ApprovalDate = sysdatetime()
-            WHERE OrderID = @OrderID";
+            WHERE OrderID = @OrderID
+            EXEC dbo.Update_LastUpdatedAt @Table = 'Order', @ID = @OrderID, @IDColumn = 'OrderID';";
 
         // Query for getting the status of an order
         public const string GetOrderStatusById = @"

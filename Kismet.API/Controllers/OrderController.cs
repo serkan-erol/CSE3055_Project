@@ -1,5 +1,5 @@
 using Kismet.Entities.DTOs;
-using Kismet.Entities.Models;
+using Kismet.Entities.Enums;
 using Kismet.Repository.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 
@@ -260,7 +260,7 @@ public class OrderController : ControllerBase
             
             // This should never happen, this is a fallback
             // Check if the order is already completed but if we are here, IsLocked is false!!!
-            // Redundant check, since the DB trigger will prevent updates if the order is locked
+            // Redundant check, since the DB trigger will prevent updates if the order is completed
             //aaa if (order.OrderStatus >= OrderStatus.Delivered)
             // {
             //    return BadRequest(new { error = "Order is already completed. It cannot be updated. Check the order's IsLocked status!" });
@@ -334,7 +334,7 @@ public class OrderController : ControllerBase
         }
     }
 
-    /// <summary>
+        /// <summary>
     /// Get order status by ID
     /// </summary>
     [HttpGet("{orderId:int}/get-order-status/")]
@@ -354,6 +354,33 @@ public class OrderController : ControllerBase
             
             // Return the order status
             return Ok(orderStatus);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Get order status display name by ID
+    /// </summary>
+    [HttpGet("{orderId:int}/get-order-status-display-name/")]
+    public async Task<IActionResult> GetOrderStatusDisplayNameByIdAsync(int orderId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            // Check if the order exists
+            var order = await _orderRepository.GetOrderByOrderIdForEmployeeAsync(orderId, cancellationToken);
+            if (order is null)
+            {
+                return NotFound(new { error = "Order not found" });
+            }
+
+            // Get the order status display name by ID
+            var orderStatusDisplayName = await _orderRepository.GetOrderStatusDisplayNameByIdAsync(orderId, cancellationToken);
+            
+            // Return the order status display name
+            return Ok(orderStatusDisplayName);
         }
         catch (Exception ex)
         {
