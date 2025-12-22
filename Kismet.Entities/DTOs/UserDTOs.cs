@@ -13,6 +13,7 @@ namespace Kismet.Entities.DTOs;
 /// </summary>
 public class UserResponseDto
 {
+    public int UserID { get; set; }
     public string UserType { get; set; } = string.Empty;
     public string UserName { get; set; } = string.Empty;
     public string ContactEmail { get; set; } = string.Empty;

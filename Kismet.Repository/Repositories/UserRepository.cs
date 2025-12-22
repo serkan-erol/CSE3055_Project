@@ -15,24 +15,6 @@ public class UserRepository : IUserRepository
     {
         _connectionFactory = connectionFactory;
     }
-
-    // Entity methods (for internal use if needed)
-    public async Task<IReadOnlyList<User>> GetAllAsync(CancellationToken cancellationToken = default)
-    {
-        using var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken);
-        var users = await connection.QueryAsync<User>(
-            new CommandDefinition(SqlQueries.User.GetAll, cancellationToken: cancellationToken));
-        return users.ToList().AsReadOnly();
-    }
-
-    public async Task<User?> GetByIdAsync(int userId, CancellationToken cancellationToken = default)
-    {
-        using var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken);
-        return await connection.QueryFirstOrDefaultAsync<User>(
-            new CommandDefinition(SqlQueries.User.GetById, 
-                new { UserID = userId }, 
-                cancellationToken: cancellationToken));
-    }
     
     /// <summary>
     /// Get all users
@@ -43,7 +25,7 @@ public class UserRepository : IUserRepository
         
         // Dapper maps SQL result columns to DTO properties by name (case-insensitive)
         var users = await connection.QueryAsync<UserResponseDto>(
-            new CommandDefinition(SqlQueries.User.GetAllDto, cancellationToken: cancellationToken));
+            new CommandDefinition(SqlQueries.User.GetUserBase + " ORDER BY u.UserID", cancellationToken: cancellationToken));
         
         return users.ToList().AsReadOnly();
     }
@@ -57,7 +39,7 @@ public class UserRepository : IUserRepository
         
         // Dapper maps the SQL result to UserResponseDto  
         return await connection.QueryFirstOrDefaultAsync<UserResponseDto>(
-            new CommandDefinition(SqlQueries.User.GetByIdDto, 
+            new CommandDefinition(SqlQueries.User.GetUserBase + " WHERE u.UserID = @UserID", 
                 new { UserID = userId }, 
                 cancellationToken: cancellationToken));
     }
@@ -196,4 +178,3 @@ public class UserRepository : IUserRepository
         }
     }
 }
-

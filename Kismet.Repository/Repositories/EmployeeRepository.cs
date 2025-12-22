@@ -15,24 +15,6 @@ public class EmployeeRepository : IEmployeeRepository
     {
         _connectionFactory = connectionFactory;
     }
-
-    // Entity methods (for internal use if needed)
-    public async Task<IReadOnlyList<Employee>> GetAllAsync(CancellationToken cancellationToken = default)
-    {
-        using var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken);
-        var employees = await connection.QueryAsync<Employee>(
-            new CommandDefinition(SqlQueries.Employee.GetAll, cancellationToken: cancellationToken));
-        return employees.ToList().AsReadOnly();
-    }
-
-    public async Task<Employee?> GetByIdAsync(int employeeId, CancellationToken cancellationToken = default)
-    {
-        using var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken);
-        return await connection.QueryFirstOrDefaultAsync<Employee>(
-            new CommandDefinition(SqlQueries.Employee.GetById, 
-                new { EmployeeID = employeeId }, 
-                cancellationToken: cancellationToken));
-    }
     
     /// <summary>
     /// Get all employees
@@ -43,7 +25,9 @@ public class EmployeeRepository : IEmployeeRepository
         
         // Dapper maps SQL result columns to DTO properties by name (case-insensitive)
         var employees = await connection.QueryAsync<EmployeeResponseDto>(
-            new CommandDefinition(SqlQueries.Employee.GetAllDto, cancellationToken: cancellationToken));
+            
+            // No parameters needed
+            new CommandDefinition(SqlQueries.Employee.GetEmployeeBase, cancellationToken: cancellationToken));
         
         return employees.ToList().AsReadOnly();
     }
@@ -57,50 +41,58 @@ public class EmployeeRepository : IEmployeeRepository
         
         // Dapper maps the SQL result to EmployeeResponseDto  
         return await connection.QueryFirstOrDefaultAsync<EmployeeResponseDto>(
-            new CommandDefinition(SqlQueries.Employee.GetByIdDto, 
+            // Build the query dynamically based on the parameters
+            new CommandDefinition(SqlQueries.Employee.GetEmployeeBase + " WHERE e.EmployeeID = @EmployeeID", 
                 new { EmployeeID = employeeId }, 
                 cancellationToken: cancellationToken));
     }
-
+    
     /// <summary>
-    /// Create a new employee from DTO - Dapper maps DTO properties to SQL parameters
+    /// Create a new employee
     /// </summary>
     public async Task<EmployeeResponseDto> CreateAsync(CreateEmployeeDto dto, CancellationToken cancellationToken = default)
     {
-        using var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken);
-        using var transaction = await connection.BeginTransactionAsync(cancellationToken);
-
-        try
+        int userId;
+        
+        using (var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken))
         {
-            // Insert User (super-type) - Dapper maps DTO properties to SQL parameters
-            var userId = await connection.QuerySingleAsync<int>(
-                new CommandDefinition(SqlQueries.User.InsertEmployeeUser, dto, 
-                    transaction, cancellationToken: cancellationToken));
+            using var transaction = await connection.BeginTransactionAsync(cancellationToken);
 
-            //aaa Generate EmployeeNumber (we might want to use a stored procedure or function in DB for this)
-            var employeeNumber = $"E{userId:D9}"; // Format: C000000001
+            try
+            {
+                // Insert User (super-type) - create anonymous object from DTO + required UserType value
+                userId = await connection.QuerySingleAsync<int>(
+                    new CommandDefinition(SqlQueries.User.InsertUser, new
+                    {
+                        dto.UserName,
+                        dto.ContactEmail,
+                        dto.ContactPhone,
+                        dto.PasswordHash,
+                        UserType = "Employee"
+                    }, 
+                        transaction, cancellationToken: cancellationToken));
 
-            // Insert Employee (sub-type) - create anonymous object from DTO + generated values
-            await connection.ExecuteAsync(
-                new CommandDefinition(SqlQueries.Employee.InsertEmployee, new
-                {
-                    EmployeeID = userId,
-                    EmployeeNumber = employeeNumber,
-                    dto.EmployeeRole,
-                    dto.AccessLevel
-                }, transaction, cancellationToken: cancellationToken));
+                // Insert Employee (sub-type) - create anonymous object from DTO + generated values
+                await connection.ExecuteAsync(
+                    new CommandDefinition(SqlQueries.Employee.InsertEmployee, new
+                    {
+                        EmployeeID = userId,
+                        dto.EmployeeRole,
+                        dto.AccessLevel
+                    }, transaction, cancellationToken: cancellationToken));
 
-            await transaction.CommitAsync(cancellationToken);
-
-            // Return the created employee as DTO
-            return await GetByIdDtoAsync(userId, cancellationToken) 
-                ?? throw new InvalidOperationException("Failed to retrieve created employee");
+                await transaction.CommitAsync(cancellationToken);
+            }
+            catch
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                throw;
+            }
         }
-        catch
-        {
-            await transaction.RollbackAsync(cancellationToken);
-            throw;
-        }
+
+        // Retrieve the created employee using a new connection after transaction is committed and disposed
+        return await GetByIdDtoAsync(userId, cancellationToken) 
+            ?? throw new InvalidOperationException("Failed to retrieve created employee");
     }
 
     /// <summary>
@@ -162,7 +154,6 @@ public class EmployeeRepository : IEmployeeRepository
     public async Task<bool> DeleteAsync(int employeeId, CancellationToken cancellationToken = default)
     {
         // Delete from Employee first (sub-type), then User (super-type)
-        // Note: This assumes CASCADE DELETE is not configured
         using var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken);
         using var transaction = await connection.BeginTransactionAsync(cancellationToken);
 
@@ -194,4 +185,3 @@ public class EmployeeRepository : IEmployeeRepository
         }
     }
 }
-

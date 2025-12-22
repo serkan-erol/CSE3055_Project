@@ -36,7 +36,7 @@ var app = builder.Build();
 app.UseSwagger();
 app.UseSwaggerUI();
 
-app.UseHttpsRedirection();
+//aaa app.UseHttpsRedirection();
 
 app.UseCors(LocalCorsPolicy);
 
@@ -44,4 +44,7 @@ app.UseAuthorization();
 
 app.MapControllers();
 
-app.Run();
+//aaa app.MapGet("/", () => Results.Redirect("/swagger/index.html", true, true)).AllowAnonymous();
+
+// Force HTTP for development
+app.Run("http://localhost:3055/");

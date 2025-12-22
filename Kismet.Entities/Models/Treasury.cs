@@ -21,10 +21,6 @@ namespace Kismet.Entities.Models {
         public FinancialTransaction FinancialTransaction { get; set; } = null!;
 
         [Required]
-        [Column("EntryDate")]
-        public DateTimeOffset EntryDate { get; set; }
-
-        [Required]
         [Column("Amount")]
         public decimal Amount { get; set; }
 
@@ -34,6 +30,11 @@ namespace Kismet.Entities.Models {
 
         [Column("Description")]
         public string? Description { get; set; }
+
+        [Required]
+        [Column("EntryDate")]
+        [DatabaseGenerated(DatabaseGeneratedOption.Computed)]
+        public DateTimeOffset EntryDate { get; set; }
 
         [Column("LastUpdatedAt")]
         public DateTimeOffset? LastUpdatedAt { get; set; }

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using Kismet.Entities.Enums;
 
 namespace Kismet.Entities.Models 
 {
@@ -19,6 +20,10 @@ namespace Kismet.Entities.Models
 
         // Navigation property for the 1-to-M relationship with Customer
         public Customer Customer { get; set; } = null!;
+
+        [Required]
+        [Column("BillingType", TypeName = "nvarchar(8)")]   
+        public string BillingType { get; set; } = string.Empty;
 
         [Required]
         [Column("InvoiceNumber")]
@@ -41,7 +46,7 @@ namespace Kismet.Entities.Models
 
         [Required]
         [Column("BillingDate")]
-        [DatabaseGenerated(DatabaseGeneratedOption.Computed)]
+        //aaa [DatabaseGenerated(DatabaseGeneratedOption.Computed)]
         public DateTime BillingDate { get; set; }
 
         [Required]
@@ -56,6 +61,6 @@ namespace Kismet.Entities.Models
         public DateTimeOffset CreatedAt { get; set; }
 
         [Column("LastUpdatedAt")]
-        public DateTimeOffset? LastUpdatedAt { get; set; } = null!;
+        public DateTimeOffset? LastUpdatedAt { get; set; }
     }
 }

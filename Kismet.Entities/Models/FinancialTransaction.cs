@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using Kismet.Entities.Enums;
 
 namespace Kismet.Entities.Models {
 
@@ -35,7 +36,7 @@ namespace Kismet.Entities.Models {
         public Order Order { get; set; } = null!;
 
         [Required]
-        [Column("TransactionType", TypeName = "nvarchar(10)")]
+        [Column("TransactionType", TypeName = "nvarchar(8)")]
         public string TransactionType { get; set; } = string.Empty;
 
         [Required]
@@ -61,8 +62,8 @@ namespace Kismet.Entities.Models {
 
         [Required]
         [Column("TransactionDate")]
-        [DatabaseGenerated(DatabaseGeneratedOption.Computed)]
-        public DateTimeOffset TransactionDate { get; set; }
+        //aaa [DatabaseGenerated(DatabaseGeneratedOption.Computed)]
+        public DateTime TransactionDate { get; set; }
 
         [Column("LastUpdatedAt")]
         public DateTimeOffset? LastUpdatedAt { get; set; }
