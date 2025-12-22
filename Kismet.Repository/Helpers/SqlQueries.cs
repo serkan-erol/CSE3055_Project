@@ -378,4 +378,20 @@ public static class SqlQueries
             WHERE b.CustomerID = @CustomerID AND b.BillingType = @TransactionType AND b.BillingDate >= @TransactionDate
             ORDER BY b.BillingDate DESC, b.BillingID DESC";
     }
+
+    /// <summary>
+    /// Payment table related queries
+    /// </summary>
+    public static class Payment
+    {
+        // Query for PaymentResponseDto
+        public const string GetAllPayments = @"
+            SELECT *
+            FROM dbo.[Payment] p";
+
+        public const string CreatePayment = @"
+            INSERT INTO dbo.[Payment] (BillingID, FTransactionID, PaymentAmount, PaymentType, PaymentMethod, ReferenceNumber)
+            VALUES (@BillingID, @FTransactionID, @PaymentAmount, @PaymentType, @PaymentMethod, @ReferenceNumber);
+            SELECT CAST(SCOPE_IDENTITY() as int);";
+    }
 }
