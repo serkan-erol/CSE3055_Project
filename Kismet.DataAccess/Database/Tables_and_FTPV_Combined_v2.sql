@@ -87,12 +87,16 @@ CREATE TABLE dbo.[SavedBankInformation] (
 CREATE TABLE dbo.[Billing] (
     BillingID        int IDENTITY PRIMARY KEY,
     CustomerID       int NOT NULL,
+    -- 'Purchase' for the customer buying from us and 'Supply' for us buying from the customer
+    BillingType      nvarchar(8) NOT NULL CHECK (BillingType IN ('Purchase', 'Supply')),
     InvoiceNumber    nvarchar(50) NOT NULL UNIQUE,
     TotalDue         decimal(18, 2) NOT NULL,
     TotalPaid        decimal(18, 2) NOT NULL DEFAULT 0.00,
-    RemainingBalance AS (TotalDue - TotalPaid) PERSISTED,
+    RemainingBalance AS (TotalDue - TotalPaid) PERSISTED CHECK (RemainingBalance >= 0),
     PaymentTerms     nvarchar(255) NULL,
-    BillingDate      date NOT NULL DEFAULT CAST(getdate() as date),
+    -- BillingDate is set to 6 months from the current date by default
+    -- We assume BillingDate is the last day for the payment of the billing
+    BillingDate      date NOT NULL DEFAULT DATEADD(month, 6, CAST(getdate() as date)),
     -- 0 = Unpaid, 1 = Partial, 2 = Paid
     BillingStatus    int NOT NULL DEFAULT 0 CHECK(BillingStatus BETWEEN 0 AND 2),
     CreatedAt        datetime2 NOT NULL DEFAULT sysdatetime(),
@@ -109,6 +113,7 @@ CREATE TABLE dbo.[Order] (
     OrderID         int IDENTITY PRIMARY KEY,
     CustomerID      int NOT NULL,
     OrderNumber     nvarchar(50) NOT NULL DEFAULT 'Order00000',
+    -- 'Purchase' for the customer buying from us and 'Supply' for us buying from the customer
     OrderType       nvarchar(8) NOT NULL CHECK (OrderType IN ('Purchase', 'Supply')),
     TotalAmount     decimal(18, 2) NOT NULL DEFAULT 0.00,
     -- 0 = Pending, 1 = Approved, 2 = Shipped, 3 = Delivered, and 4 = Cancelled
@@ -135,14 +140,17 @@ CREATE TABLE dbo.[FinancialTransaction] (
     CustomerID          int NOT NULL,
     BillingID           int NOT NULL,
     OrderID             int NOT NULL,
-    TransactionType     nvarchar(10) NOT NULL CHECK (TransactionType IN ('Puchase', 'Sale')),
+    -- 'Purchase' for the customer paying us and 'Supply' for us paying the customer
+    TransactionType     nvarchar(10) NOT NULL CHECK (TransactionType IN ('Purchase', 'Supply')),
     TotalAmount         decimal(18, 2) NOT NULL,
     TotalPaid           decimal(18, 2) NOT NULL DEFAULT 0.00,
-    RemainingBalance    AS (TotalAmount - TotalPaid) PERSISTED,
+    RemainingBalance    AS (TotalAmount - TotalPaid) PERSISTED CHECK (RemainingBalance >= 0),
     -- 0 = Unpaid, 1 = Partial, 2 = Paid
     PaymentStatus       int NOT NULL DEFAULT 0 CHECK (PaymentStatus BETWEEN 0 AND 2), 
     Description         nvarchar(255) NULL,
-    TransactionDate     datetime2 NOT NULL DEFAULT sysdatetime(),
+    -- TransactionDate is set to 6 months from the current date by default
+    -- We assume TransactionDate is the last day for the payment of the transaction
+    TransactionDate     date NOT NULL DEFAULT DATEADD(month, 6, CAST(getdate() as date)),
     LastUpdatedAt       datetime2 NULL,
 
     CONSTRAINT FK_Transaction_Customer
@@ -161,7 +169,6 @@ CREATE TABLE dbo.[Treasury] (
     BalanceAfter    decimal(18, 2) NOT NULL,
     Description     nvarchar(255) NULL,
     EntryDate       datetime2 NOT NULL DEFAULT sysdatetime(),
-    -- There should NOT be any updated in the rows of this table. This is to check if we are doing it right
     LastUpdatedAt   datetime2 NULL,
 
     CONSTRAINT FK_Treasury_Transaction
@@ -173,8 +180,10 @@ CREATE TABLE dbo.[Payment] (
     PaymentID        int IDENTITY PRIMARY KEY,
     BillingID        int NOT NULL,
     FTransactionID   int NOT NULL,
-    PaymentAmount    decimal(18, 2) NOT NULL,
-    PaymentType      nvarchar(50) NOT NULL, -- Send money or Recieve depending on the Transaction and/or  related Order Type
+    PaymentAmount    decimal(18, 2) NOT NULL CHECK (PaymentAmount > 0),
+    -- 'Receive' for the customer paying us (associated with a Purchase Order / FinancialTransaction) 
+    -- and 'Send' for us paying the customer (associated with a Supply Order / FinancialTransaction)
+    PaymentType      nvarchar(50) NOT NULL CHECK (PaymentType IN ('Receive', 'Send')), 
     PaymentDate      datetime2 NOT NULL DEFAULT sysdatetime(),
     PaymentMethod    nvarchar(50) NULL,     -- Cash, credit card, debit card etc.
     ReferenceNumber  nvarchar(100) NULL,    -- We can use a function and a trigger to generate a reference number within set parameters
@@ -190,7 +199,7 @@ CREATE TABLE dbo.[Payment] (
 -- Shipment --
 CREATE TABLE dbo.[Shipment] (
     ShipmentID           int IDENTITY PRIMARY KEY,
-    POrderID             int NOT NULL,
+    OrderID             int NOT NULL,
     CustomsDocRef        nvarchar(100) NULL,
     -- 0 = Pending, 1 = In Transit, 2 = Delivered, and 3 = Failed
     ShipmentStatus       int NOT NULL DEFAULT 0 CHECK (ShipmentStatus BETWEEN 0 AND 3),
@@ -205,7 +214,7 @@ CREATE TABLE dbo.[Shipment] (
     LastUpdatedAt        datetime2 NULL,
 
     CONSTRAINT FK_Shipment_Order
-        FOREIGN KEY (POrderID) REFERENCES dbo.[Order](OrderID)
+        FOREIGN KEY (OrderID) REFERENCES dbo.[Order](OrderID)
 );
 
 --------------------------------------------------------------------------------------------------------------------------------
@@ -259,7 +268,7 @@ CREATE TABLE dbo.[Batch] (
 ---------------------------------------------------------- PROCEDURES ----------------------------------------------------------
 --------------------------------------------------------------------------------------------------------------------------------
 
--- Procedure to assign a random and unique EmployeeNumber or CustomerNumber based on the prefix
+-- Procedure to assign a random and unique EmployeeNumber or CustomerNumber or OrderNumber based on the prefix
 IF OBJECT_ID('dbo.AssignRandomNumber', 'P') IS NOT NULL
     DROP PROCEDURE dbo.AssignRandomNumber;
 GO
@@ -383,6 +392,26 @@ BEGIN
                  WHERE ' + QUOTENAME(@IDColumn) + N' = @ID';
     
     EXEC sp_executesql @SQL, N'@ID int', @ID = @ID;
+END;
+GO
+
+--------------------------------------------------------------------------------------------------------------------------------
+
+--Procedure to update BillingStatus based on TotalDue and TotalPaid
+CREATE PROCEDURE dbo.Update_BillingStatus
+    @BillingID int
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    UPDATE dbo.[Billing]
+    SET BillingStatus = CASE
+        WHEN TotalDue = TotalPaid THEN 2
+        WHEN TotalDue > TotalPaid THEN 1
+        WHEN TotalPaid = 0 THEN 0
+        ELSE -1 -- This should never happen! It is just a fallback to see if there are any erros in the logic
+    END
+    WHERE BillingID = @BillingID;
 END;
 GO
 
@@ -594,6 +623,33 @@ BEGIN
     BEGIN
         ROLLBACK TRANSACTION;
         RAISERROR('Shipment table is locked. It cannot be updated.', 16, 1);
+    END
+END;
+GO
+
+--------------------------------------------------------------------------------------------------------------------------------
+
+-- Trigger to update BillingStatus when TotalDue, TotalPaid, or RemainingBalance changes
+CREATE TRIGGER dbo.trg_Update_BillingStatus
+ON dbo.[Billing]
+AFTER UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    -- Only update when the following columns are changed
+    -- TotalDue, TotalPaid, RemainingBalance
+    IF EXISTS (
+        SELECT 1 FROM inserted i
+        INNER JOIN deleted d ON i.BillingID = d.BillingID
+        WHERE ((i.TotalDue <> d.TotalDue) OR 
+            (i.TotalPaid <> d.TotalPaid) OR 
+            (i.RemainingBalance <> d.RemainingBalance))
+            AND i.TotalDue > 0 AND i.TotalPaid > 0
+    )
+    BEGIN
+        DECLARE @BillingID int = (SELECT BillingID FROM inserted);
+        EXEC dbo.Update_BillingStatus @BillingID = @BillingID;
     END
 END;
 GO

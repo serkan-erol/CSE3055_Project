@@ -11,7 +11,7 @@ public static class SqlQueries
     public static class User
     {
         // Query for UserResponseDto
-        public const string GetAllDto = @"
+        public const string GetUserBase = @"
             SELECT 
                 u.UserID,
                 u.UserType,
@@ -20,20 +20,7 @@ public static class SqlQueries
                 u.ContactPhone,
                 u.CreatedAt,
                 u.LastUpdatedAt
-            FROM dbo.[User] u
-            ORDER BY u.UserID";
-
-        public const string GetByIdDto = @"
-            SELECT 
-                u.UserID,
-                u.UserType,
-                u.UserName,
-                u.ContactEmail,
-                u.ContactPhone,
-                u.CreatedAt,
-                u.LastUpdatedAt
-            FROM dbo.[User] u
-            WHERE u.UserID = @UserID";
+            FROM dbo.[User] u";
 
         public const string InsertUser = @"
             INSERT INTO dbo.[User] (UserName, ContactEmail, ContactPhone, PasswordHash, UserType)
@@ -83,6 +70,8 @@ public static class SqlQueries
                 c.CustomerNumber,
                 c.CustomerType,
                 c.ReliabilityStatus,
+                c.City,
+                c.Country,
                 u.UserName,
                 u.ContactEmail,
                 u.ContactPhone,
@@ -92,8 +81,8 @@ public static class SqlQueries
             INNER JOIN dbo.[User] u ON u.UserID = c.CustomerID AND u.UserType = c.UserType";
 
         public const string InsertCustomer = @"
-            INSERT INTO dbo.[Customer] (CustomerID, CustomerType, ReliabilityStatus)
-            VALUES (@CustomerID, @CustomerType, @ReliabilityStatus);";
+            INSERT INTO dbo.[Customer] (CustomerID, CustomerType, ReliabilityStatus, City, Country)
+            VALUES (@CustomerID, @CustomerType, @ReliabilityStatus, @City, @Country);";
 
         public const string UpdateCustomerType = @"
             UPDATE dbo.[Customer]
@@ -106,6 +95,20 @@ public static class SqlQueries
             UPDATE dbo.[Customer]
             SET 
                 ReliabilityStatus = COALESCE(@ReliabilityStatus, ReliabilityStatus)
+            WHERE CustomerID = @CustomerID
+            EXEC dbo.Update_LastUpdatedAt @Table = 'User', @ID = @CustomerID, @IDColumn = 'UserID';";
+
+        public const string UpdateCustomerCity = @"
+            UPDATE dbo.[Customer]
+            SET 
+                City = COALESCE(@City, City)
+            WHERE CustomerID = @CustomerID
+            EXEC dbo.Update_LastUpdatedAt @Table = 'User', @ID = @CustomerID, @IDColumn = 'UserID';";
+
+        public const string UpdateCustomerCountry = @"
+            UPDATE dbo.[Customer]
+            SET 
+                Country = COALESCE(@Country, Country)
             WHERE CustomerID = @CustomerID
             EXEC dbo.Update_LastUpdatedAt @Table = 'User', @ID = @CustomerID, @IDColumn = 'UserID';";
 
@@ -130,8 +133,7 @@ public static class SqlQueries
                 u.CreatedAt,
                 u.LastUpdatedAt
             FROM dbo.[Employee] e
-            INNER JOIN dbo.[User] u ON u.UserID = e.EmployeeID AND u.UserType = e.UserType
-            ORDER BY e.EmployeeID";
+            INNER JOIN dbo.[User] u ON u.UserID = e.EmployeeID AND u.UserType = e.UserType";
 
         public const string InsertEmployee = @"
             INSERT INTO dbo.[Employee] (EmployeeID, EmployeeRole, AccessLevel)
@@ -228,5 +230,76 @@ public static class SqlQueries
                 o.IsLocked
             FROM dbo.[Order] o
             WHERE o.OrderID = @OrderID";
+    }
+
+    /// <summary>
+    /// Billing table related queries
+    /// </summary>
+    public static class Billing
+    {
+        // Query for BillingResponseDto
+        public const string GetBillingBaseEmployee = @"
+            SELECT *
+            FROM dbo.[Billing] b";
+
+        // Query for BillingResponseToCustomerDto
+        public const string GetBillingBaseCustomer = @"
+            SELECT 
+                b.BillingType,
+                b.InvoiceNumber,
+                b.TotalDue,
+                b.TotalPaid,
+                b.RemainingBalance,
+                b.PaymentTerms,
+                b.BillingDate,
+                b.LastUpdatedAt
+            FROM dbo.[Billing] b";
+
+        // Query for BillingStatusResponseDto
+        public const string GetBillingStatusById = @"
+            SELECT 
+                b.BillingStatus
+            FROM dbo.[Billing] b
+            WHERE b.BillingID = @BillingID";
+
+        public const string InsertBilling = @"
+            INSERT INTO dbo.[Billing] (CustomerID, InvoiceNumber, TotalDue, PaymentTerms, BillingDate)
+            VALUES (@CustomerID, @InvoiceNumber, @TotalDue, @PaymentTerms, @BillingDate);
+            SELECT CAST(SCOPE_IDENTITY() as int);";
+
+        public const string UpdateBillingType = @"
+            UPDATE dbo.[Billing]
+            SET 
+                BillingType = COALESCE(@BillingType, BillingType),
+                LastUpdatedAt = sysdatetime()
+            WHERE BillingID = @BillingID";
+            
+        public const string UpdateBillingTotalDue = @"
+            UPDATE dbo.[Billing]
+            SET 
+                TotalDue = TotalDue + COALESCE(@TotalDue, 0),
+                LastUpdatedAt = sysdatetime()
+            WHERE BillingID = @BillingID";
+        
+        public const string UpdateBillingTotalPaid = @"
+            UPDATE dbo.[Billing]
+            SET 
+                TotalPaid = TotalPaid + COALESCE(@TotalPaid, 0),
+                LastUpdatedAt = sysdatetime()
+            WHERE BillingID = @BillingID";
+
+        public const string UpdateBillingPaymentTerms = @"
+            UPDATE dbo.[Billing]
+            SET 
+                PaymentTerms = COALESCE(@PaymentTerms, PaymentTerms),
+                LastUpdatedAt = sysdatetime()
+            WHERE BillingID = @BillingID";
+
+        public const string UpdateBillingDate = @"
+            UPDATE dbo.[Billing]
+            SET
+                BillingDate = COALESCE(@BillingDate, BillingDate),
+                LastUpdatedAt = sysdatetime()
+            WHERE BillingID = @BillingID";
     }
 }

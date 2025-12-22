@@ -14,6 +14,8 @@ public class CustomerResponseDto
     public string CustomerNumber { get; set; } = string.Empty;
     public string? CustomerType { get; set; }
     public bool ReliabilityStatus { get; set; }
+    public string? City { get; set; }
+    public string? Country { get; set; }
     
     // From User table
     public string UserName { get; set; } = string.Empty;
@@ -49,6 +51,12 @@ public class CreateCustomerDto
     public string? CustomerType { get; set; }
 
     public bool ReliabilityStatus { get; set; } = true; // Default to reliable
+
+    [StringLength(50)]
+    public string? City { get; set; }
+
+    [StringLength(50)]
+    public string? Country { get; set; }
 }
 
 /// <summary>
@@ -77,4 +85,19 @@ public class UpdateCustomerReliabilityDto
     public int CustomerID { get; set; }
 
     public bool ReliabilityStatus { get; set; }
+}
+
+/// <summary>
+/// DTO for updating Customer's city and country
+/// </summary>
+public class UpdateCustomerCityAndCountryDto
+{
+    [JsonIgnore]
+    public int CustomerID { get; set; }
+
+    [StringLength(50)]
+    public string? City { get; set; }
+
+    [StringLength(50)]
+    public string? Country { get; set; }
 }

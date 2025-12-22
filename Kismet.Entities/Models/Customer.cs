@@ -34,5 +34,11 @@ namespace Kismet.Entities.Models
         [Required]
         [Column("ReliabilityStatus")]
         public bool ReliabilityStatus { get; set; }
+
+        [Column("City")]
+        public string? City { get; set; }
+
+        [Column("Country")]
+        public string? Country { get; set; }
     }
 }

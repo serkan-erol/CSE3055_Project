@@ -52,43 +52,47 @@ public class EmployeeRepository : IEmployeeRepository
     /// </summary>
     public async Task<EmployeeResponseDto> CreateAsync(CreateEmployeeDto dto, CancellationToken cancellationToken = default)
     {
-        using var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken);
-        using var transaction = await connection.BeginTransactionAsync(cancellationToken);
-
-        try
+        int userId;
+        
+        using (var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken))
         {
-            // Insert User (super-type) - create anonymous object from DTO + required UserType value
-            var userId = await connection.QuerySingleAsync<int>(
-                new CommandDefinition(SqlQueries.User.InsertUser, new
-                {
-                    dto.UserName,
-                    dto.ContactEmail,
-                    dto.ContactPhone,
-                    dto.PasswordHash,
-                    UserType = "Employee"
-                }, 
-                    transaction, cancellationToken: cancellationToken));
+            using var transaction = await connection.BeginTransactionAsync(cancellationToken);
 
-            // Insert Employee (sub-type) - create anonymous object from DTO + generated values
-            await connection.ExecuteAsync(
-                new CommandDefinition(SqlQueries.Employee.InsertEmployee, new
-                {
-                    EmployeeID = userId,
-                    dto.EmployeeRole,
-                    dto.AccessLevel
-                }, transaction, cancellationToken: cancellationToken));
+            try
+            {
+                // Insert User (super-type) - create anonymous object from DTO + required UserType value
+                userId = await connection.QuerySingleAsync<int>(
+                    new CommandDefinition(SqlQueries.User.InsertUser, new
+                    {
+                        dto.UserName,
+                        dto.ContactEmail,
+                        dto.ContactPhone,
+                        dto.PasswordHash,
+                        UserType = "Employee"
+                    }, 
+                        transaction, cancellationToken: cancellationToken));
 
-            await transaction.CommitAsync(cancellationToken);
+                // Insert Employee (sub-type) - create anonymous object from DTO + generated values
+                await connection.ExecuteAsync(
+                    new CommandDefinition(SqlQueries.Employee.InsertEmployee, new
+                    {
+                        EmployeeID = userId,
+                        dto.EmployeeRole,
+                        dto.AccessLevel
+                    }, transaction, cancellationToken: cancellationToken));
 
-            // Return the created employee as DTO
-            return await GetByIdDtoAsync(userId, cancellationToken) 
-                ?? throw new InvalidOperationException("Failed to retrieve created employee");
+                await transaction.CommitAsync(cancellationToken);
+            }
+            catch
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                throw;
+            }
         }
-        catch
-        {
-            await transaction.RollbackAsync(cancellationToken);
-            throw;
-        }
+
+        // Retrieve the created employee using a new connection after transaction is committed and disposed
+        return await GetByIdDtoAsync(userId, cancellationToken) 
+            ?? throw new InvalidOperationException("Failed to retrieve created employee");
     }
 
     /// <summary>

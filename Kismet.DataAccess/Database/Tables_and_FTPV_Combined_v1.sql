@@ -133,7 +133,7 @@ CREATE TABLE dbo.[FinancialTransaction] (
     CustomerID          int NOT NULL,
     BillingID           int NOT NULL,
     OrderID             int NOT NULL,
-    TransactionType     nvarchar(10) NOT NULL CHECK (TransactionType IN ('Puchase', 'Sale')),
+    TransactionType     nvarchar(10) NOT NULL CHECK (TransactionType IN ('Purchase', 'Sale')),
     TotalAmount         decimal(18, 2) NOT NULL,
     TotalPaid           decimal(18, 2) NOT NULL DEFAULT 0.00,
     RemainingBalance    AS (TotalAmount - TotalPaid) PERSISTED,
@@ -159,7 +159,6 @@ CREATE TABLE dbo.[Treasury] (
     BalanceAfter    decimal(18, 2) NOT NULL,
     Description     nvarchar(255) NULL,
     EntryDate       datetime2 NOT NULL DEFAULT sysdatetime(),
-    -- There should NOT be any updated in the rows of this table. This is to check if we are doing it right
     LastUpdatedAt   datetime2 NULL,
 
     CONSTRAINT FK_Treasury_Transaction
@@ -188,7 +187,7 @@ CREATE TABLE dbo.[Payment] (
 -- Shipment --
 CREATE TABLE dbo.[Shipment] (
     ShipmentID           int IDENTITY PRIMARY KEY,
-    POrderID             int NOT NULL,
+    OrderID             int NOT NULL,
     CustomsDocRef        nvarchar(100) NULL,
     -- 0 = Pending, 1 = In Transit, 2 = Delivered, and 3 = Failed
     ShipmentStatus       int NOT NULL DEFAULT 0 CHECK (ShipmentStatus BETWEEN 0 AND 3),
@@ -203,7 +202,7 @@ CREATE TABLE dbo.[Shipment] (
     LastUpdatedAt        datetime2 NULL,
 
     CONSTRAINT FK_Shipment_Order
-        FOREIGN KEY (POrderID) REFERENCES dbo.[Order](OrderID)
+        FOREIGN KEY (OrderID) REFERENCES dbo.[Order](OrderID)
 );
 
 --------------------------------------------------------------------------------------------------------------------------------

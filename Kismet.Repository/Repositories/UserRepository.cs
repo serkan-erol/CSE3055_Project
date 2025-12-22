@@ -25,7 +25,7 @@ public class UserRepository : IUserRepository
         
         // Dapper maps SQL result columns to DTO properties by name (case-insensitive)
         var users = await connection.QueryAsync<UserResponseDto>(
-            new CommandDefinition(SqlQueries.User.GetAllDto, cancellationToken: cancellationToken));
+            new CommandDefinition(SqlQueries.User.GetUserBase + " ORDER BY u.UserID", cancellationToken: cancellationToken));
         
         return users.ToList().AsReadOnly();
     }
@@ -39,7 +39,7 @@ public class UserRepository : IUserRepository
         
         // Dapper maps the SQL result to UserResponseDto  
         return await connection.QueryFirstOrDefaultAsync<UserResponseDto>(
-            new CommandDefinition(SqlQueries.User.GetByIdDto, 
+            new CommandDefinition(SqlQueries.User.GetUserBase + " WHERE u.UserID = @UserID", 
                 new { UserID = userId }, 
                 cancellationToken: cancellationToken));
     }
@@ -178,4 +178,3 @@ public class UserRepository : IUserRepository
         }
     }
 }
-

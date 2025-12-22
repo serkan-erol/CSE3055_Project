@@ -72,7 +72,6 @@ public class EmployeeController : ControllerBase
             {
                 return BadRequest(ModelState);
             }
-
             
             var created = await _employeeRepository.CreateAsync(dto, cancellationToken);
             
@@ -86,9 +85,9 @@ public class EmployeeController : ControllerBase
     }
 
     /// <summary>
-    /// Update employee type only
+    /// Update employee role
     /// </summary>
-    [HttpPut("{id:int}/type")]
+    [HttpPut("{id:int}/role")]
     public async Task<IActionResult> UpdateEmployeeRoleAsync(int id, [FromBody] UpdateEmployeeRoleDto dto, CancellationToken cancellationToken)
     {
         try

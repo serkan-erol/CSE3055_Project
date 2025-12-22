@@ -22,6 +22,10 @@ namespace Kismet.Entities.Models
         public Customer Customer { get; set; } = null!;
 
         [Required]
+        [Column("BillingType", TypeName = "nvarchar(8)")]   
+        public string BillingType { get; set; } = string.Empty;
+
+        [Required]
         [Column("InvoiceNumber")]
         public string InvoiceNumber { get; set; } = string.Empty;
 
@@ -42,7 +46,7 @@ namespace Kismet.Entities.Models
 
         [Required]
         [Column("BillingDate")]
-        [DatabaseGenerated(DatabaseGeneratedOption.Computed)]
+        //aaa [DatabaseGenerated(DatabaseGeneratedOption.Computed)]
         public DateTime BillingDate { get; set; }
 
         [Required]

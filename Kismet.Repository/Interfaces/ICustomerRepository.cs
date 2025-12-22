@@ -14,6 +14,7 @@ public interface ICustomerRepository
     Task<CustomerResponseDto> CreateAsync(CreateCustomerDto dto, CancellationToken cancellationToken = default);
     Task<CustomerResponseDto?> UpdateCustomerTypeAsync(UpdateCustomerTypeDto dto, CancellationToken cancellationToken = default);
     Task<CustomerResponseDto?> UpdateCustomerReliabilityAsync(UpdateCustomerReliabilityDto dto, CancellationToken cancellationToken = default);
+    Task<CustomerResponseDto?> UpdateCustomerCityAndCountryAsync(UpdateCustomerCityAndCountryDto dto, CancellationToken cancellationToken = default);
     
     // Delete 
     Task<bool> DeleteAsync(int customerId, CancellationToken cancellationToken = default);

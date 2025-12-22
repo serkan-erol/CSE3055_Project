@@ -145,6 +145,41 @@ public class CustomerController : ControllerBase
     }
 
     /// <summary>
+    /// Update only City and Country
+    /// </summary>
+    [HttpPut("{id:int}/city-country")]
+    public async Task<IActionResult> UpdateCityAndCountryAsync(int id, [FromBody] UpdateCustomerCityAndCountryDto dto, CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            if (dto.City is null && dto.Country is null)
+            {
+                return BadRequest(new { error = "At least one of City or Country must be provided" });
+            }
+
+            dto.CustomerID = id; // Ensure ID matches route parameter
+            
+            var updated = await _customerRepository.UpdateCustomerCityAndCountryAsync(dto, cancellationToken);
+            
+            if (updated is null)
+            {
+                return NotFound(new { error = "Customer not found" });
+            }
+
+            return Ok(updated);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    /// <summary>
     /// Delete customer
     /// </summary>
     [HttpDelete("{id:int}")]
