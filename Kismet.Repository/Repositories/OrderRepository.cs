@@ -55,7 +55,7 @@ public class OrderRepository : IOrderRepository
     /// <summary>
     /// Get an order by ID for a customer to see
     /// </summary>
-    public async Task<OrderResponseToCustomerDto> GetOrderByOrderIdForCustomerAsync(int orderId, int customerId, CancellationToken cancellationToken = default)
+    public async Task<OrderResponseToCustomerDto> GetOrderByIdForCustomerAsync(int customerId, int orderId, CancellationToken cancellationToken = default)
     {
         using var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken);
 
@@ -71,7 +71,7 @@ public class OrderRepository : IOrderRepository
     /// <summary>
     /// Get an order by ID for an employee to see
     /// </summary>
-    public async Task<OrderResponseToEmployeeDto> GetOrderByOrderIdForEmployeeAsync(int orderId, CancellationToken cancellationToken = default)
+    public async Task<OrderResponseToEmployeeDto> GetOrderByIdForEmployeeAsync(int orderId, CancellationToken cancellationToken = default)
     {
         using var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken);
 
@@ -109,8 +109,8 @@ public class OrderRepository : IOrderRepository
         var orderId = await connection.QuerySingleAsync<int>(
             new CommandDefinition(SqlQueries.Order.InsertOrder, dto, cancellationToken: cancellationToken));
         
-        // Use the existing method to retrieve the order, just like Customer/Employee do
-        return await GetOrderByOrderIdForCustomerAsync(orderId, dto.CustomerID, cancellationToken);
+        // Use the existing method to retrieve the order
+        return await GetOrderByIdForCustomerAsync(dto.CustomerID, orderId, cancellationToken);
     }
 
     /// <summary>
@@ -125,7 +125,7 @@ public class OrderRepository : IOrderRepository
             new CommandDefinition(SqlQueries.Order.UpdateOrderStatus, dto, cancellationToken: cancellationToken));
         
         // Return the updated order using the employee DTO
-        return await GetOrderByOrderIdForEmployeeAsync(dto.OrderID, cancellationToken);
+        return await GetOrderByIdForEmployeeAsync(dto.OrderID, cancellationToken);
     }
 
     /// <summary>
@@ -140,7 +140,7 @@ public class OrderRepository : IOrderRepository
             new CommandDefinition(SqlQueries.Order.ApproveOrder, dto, cancellationToken: cancellationToken));
         
         // Return the approved order
-        return await GetOrderByOrderIdForEmployeeAsync(dto.OrderID, cancellationToken);
+        return await GetOrderByIdForEmployeeAsync(dto.OrderID, cancellationToken);
     }
 
     /// <summary>

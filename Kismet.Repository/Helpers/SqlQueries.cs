@@ -164,6 +164,8 @@ public static class SqlQueries
         // Base query for orders to be seen by customers (simpler fields, no join)
         public const string GetOrderBaseForCustomer = @"
             SELECT 
+                o.OrderID,
+                o.CustomerID,
                 o.OrderNumber,
                 o.OrderType,
                 o.TotalAmount,
@@ -237,14 +239,16 @@ public static class SqlQueries
     /// </summary>
     public static class Billing
     {
-        // Query for BillingResponseDto
+        // Query for BillingResponseToEmployeeDto
         public const string GetBillingBaseEmployee = @"
             SELECT *
             FROM dbo.[Billing] b";
 
         // Query for BillingResponseToCustomerDto
         public const string GetBillingBaseCustomer = @"
-            SELECT 
+            SELECT
+                b.BillingID,
+                b.CustomerID,
                 b.BillingType,
                 b.InvoiceNumber,
                 b.TotalDue,
@@ -263,10 +267,13 @@ public static class SqlQueries
             WHERE b.BillingID = @BillingID";
 
         public const string InsertBilling = @"
-            INSERT INTO dbo.[Billing] (CustomerID, InvoiceNumber, TotalDue, PaymentTerms, BillingDate)
-            VALUES (@CustomerID, @InvoiceNumber, @TotalDue, @PaymentTerms, @BillingDate);
+            INSERT INTO dbo.[Billing] (CustomerID, BillingType, InvoiceNumber, TotalDue, PaymentTerms, BillingDate)
+            VALUES (@CustomerID, @BillingType, @InvoiceNumber, @TotalDue, @PaymentTerms, @BillingDate);
             SELECT CAST(SCOPE_IDENTITY() as int);";
 
+        // aaa
+        // Depending on our decision on how to implement Billing and FT connections,
+        // We may need or we may delete this query.
         public const string UpdateBillingType = @"
             UPDATE dbo.[Billing]
             SET 
@@ -301,5 +308,74 @@ public static class SqlQueries
                 BillingDate = COALESCE(@BillingDate, BillingDate),
                 LastUpdatedAt = sysdatetime()
             WHERE BillingID = @BillingID";
+    }
+
+    /// <summary>
+    /// FinancialTransaction table related queries
+    /// </summary>
+    public static class FinancialTransaction
+    {
+        // Query for FTResponseToEmployeeDto
+        public const string GetFTBaseEmployee = @"
+            SELECT *
+            FROM dbo.[FinancialTransaction] ft";
+
+        // Query for FTResponseToCustomerDto
+        public const string GetFTBaseCustomer = @"
+            SELECT 
+                ft.FTransactionID,
+                ft.CustomerID,
+                ft.TransactionType,
+                ft.TotalAmount,
+                ft.TotalPaid,
+                ft.RemainingBalance,
+                ft.PaymentStatus,
+                ft.Description,
+                ft.TransactionDate,
+                ft.LastUpdatedAt
+            FROM dbo.[FinancialTransaction] ft";
+
+        // Query for FTPaymentStatusResponseDto
+        public const string GetFTPaymentStatusById = @"
+            SELECT 
+                ft.PaymentStatus
+            FROM dbo.[FinancialTransaction] ft
+            WHERE ft.FTransactionID = @FTransactionID";
+
+        public const string InsertFT = @"
+            INSERT INTO dbo.[FinancialTransaction] (CustomerID, BillingID, OrderID, TransactionType, TotalAmount, TotalPaid, Description, TransactionDate)
+            VALUES (@CustomerID, @BillingID, @OrderID, @TransactionType, @TotalAmount, @TotalPaid, @Description, @TransactionDate);
+            SELECT CAST(SCOPE_IDENTITY() as int);";
+
+        // Query for updating the TotalDue of a FT
+        public const string UpdateFTTotalDue = @"
+            UPDATE dbo.[FinancialTransaction]
+            SET 
+                TotalAmount = COALESCE(@TotalAmount, TotalAmount),
+                LastUpdatedAt = sysdatetime()
+            WHERE FTransactionID = @FTransactionID";
+
+        // Query for updating the TotalPaid of a FT
+        public const string UpdateFTTotalPaid = @"
+            UPDATE dbo.[FinancialTransaction]
+            SET 
+                TotalPaid = TotalPaid + COALESCE(@TotalPaid, 0),
+                LastUpdatedAt = sysdatetime()
+            WHERE FTransactionID = @FTransactionID";
+            
+        // Query for updating the description of a FT
+        public const string UpdateFTDescription = @"
+            UPDATE dbo.[FinancialTransaction]
+            SET 
+                Description = COALESCE(@Description, Description),
+                LastUpdatedAt = sysdatetime()
+            WHERE FTransactionID = @FTransactionID";
+
+        // Query for finding a suitable Billing entry for a FT
+        public const string FindSuitableBillingEntryForFT = @"
+            SELECT TOP 1 *
+            FROM dbo.[Billing] b
+            WHERE b.CustomerID = @CustomerID AND b.BillingType = @TransactionType AND b.BillingDate >= @TransactionDate
+            ORDER BY b.BillingDate DESC, b.BillingID DESC";
     }
 }

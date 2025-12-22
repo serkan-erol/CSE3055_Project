@@ -28,6 +28,8 @@ public class BillingResponseToEmployeeDto
 /// </summary>
 public class BillingResponseToCustomerDto
 {
+    public int BillingID { get; set; }
+    public int CustomerID { get; set; }
     public string BillingType { get; set; } = string.Empty;
     public string InvoiceNumber { get; set; } = string.Empty;
     public decimal TotalDue { get; set; }
@@ -56,6 +58,10 @@ public class CreateBillingDto
     public int CustomerID { get; set; }
 
     [Required]
+    [StringLength(8)]
+    public string BillingType { get; set; } = string.Empty;
+
+    [Required]
     [StringLength(50)]
     public string InvoiceNumber { get; set; } = string.Empty;
 
@@ -67,11 +73,13 @@ public class CreateBillingDto
     public string? PaymentTerms { get; set; }
 
     //aaa [DataType(DataType.Date)]
-    public DateTime? BillingDate { get; set; }
+    public DateTime? BillingDate { get; set; } = DateTime.UtcNow.AddMonths(6);
 }
 
+// We WON'T use this DTO, IF we choose to represent Purchase and Supply type FTs in separate Billing entries
+
 /// <summary>
-/// DTO for creating a new Billing
+/// DTO for updating the type of a Billing
 /// </summary>
 public class UpdateBillingTypeDto   
 {
@@ -85,7 +93,7 @@ public class UpdateBillingTypeDto
 }
 
 /// <summary>
-/// DTO for updating Billing
+/// DTO for updating the total due and total paid of a Billing
 /// </summary>
 public class UpdateBillingDto
 {
@@ -104,7 +112,7 @@ public class UpdateBillingDto
 }
 
 /// <summary>
-/// DTO for updating BillingStatus
+/// DTO for updating the payment terms of a Billing
 /// </summary>
 public class UpdateBillingPaymentTermsDto
 {
@@ -116,7 +124,7 @@ public class UpdateBillingPaymentTermsDto
 }
 
 /// <summary>
-/// DTO for updating BillingDate
+/// DTO for updating the BillingDate of a Billing
 /// </summary>
 public class UpdateBillingDateDto
 {

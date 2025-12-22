@@ -13,7 +13,7 @@ public static class DependencyInjection
         services.AddScoped<IEmployeeRepository, EmployeeRepository>();
         services.AddScoped<IOrderRepository, OrderRepository>();
         services.AddScoped<IBillingRepository, BillingRepository>();
-        //aaa services.AddScoped<IFinancialTransactionRepository, FinancialTransactionRepository>();
+        services.AddScoped<IFinancialTransactionRepository, FinancialTransactionRepository>();
         //aaa services.AddScoped<ITreasuryRepository, TreasuryRepository>();
         //aaa services.AddScoped<IPaymentRepository, PaymentRepository>();
         //aaa services.AddScoped<IShipmentRepository, ShipmentRepository>();

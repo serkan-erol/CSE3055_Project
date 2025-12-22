@@ -10,8 +10,8 @@ public interface IOrderRepository
 {
     Task<IReadOnlyList<OrderResponseToCustomerDto>> GetOrderForCustomerAsync(int customerId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<OrderResponseToEmployeeDto>> GetOrderForEmployeeAsync(CancellationToken cancellationToken = default);
-    Task<OrderResponseToCustomerDto> GetOrderByOrderIdForCustomerAsync(int orderId, int customerId, CancellationToken cancellationToken = default);
-    Task<OrderResponseToEmployeeDto> GetOrderByOrderIdForEmployeeAsync(int orderId, CancellationToken cancellationToken = default);
+    Task<OrderResponseToCustomerDto> GetOrderByIdForCustomerAsync(int customerId, int orderId, CancellationToken cancellationToken = default);
+    Task<OrderResponseToEmployeeDto> GetOrderByIdForEmployeeAsync(int orderId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<OrderResponseToEmployeeDto>> GetOrderByCustomerIdForEmployeeAsync(int customerId, CancellationToken cancellationToken = default);
     Task<OrderResponseToCustomerDto> CreateOrderAsync(CreateOrderDto dto, CancellationToken cancellationToken = default);
     Task<OrderResponseToEmployeeDto> UpdateOrderStatusAsync(UpdateOrderStatusDto dto, CancellationToken cancellationToken = default);

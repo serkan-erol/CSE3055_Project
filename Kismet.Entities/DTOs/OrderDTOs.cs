@@ -9,6 +9,8 @@ namespace Kismet.Entities.DTOs;
 /// </summary>
 public class OrderResponseToCustomerDto
 {
+    public int OrderID { get; set; }
+    public int CustomerID { get; set; }
     public string OrderNumber { get; set; } = string.Empty;
     public string OrderType { get; set; } = string.Empty;
     public decimal TotalAmount { get; set; }
@@ -39,6 +41,14 @@ public class OrderResponseToEmployeeDto
 }
 
 /// <summary>
+/// DTO for returning OrderStatus
+/// </summary>
+public class OrderStatusResponseDto
+{
+    public OrderStatus OrderStatus { get; set; }
+}
+
+/// <summary>
 /// DTO for creating a new Order
 /// </summary>
 public class CreateOrderDto
@@ -48,10 +58,10 @@ public class CreateOrderDto
     public int CustomerID { get; set; }
 
     [Required]
-    public decimal TotalAmount { get; set; }
+    public string OrderType { get; set; } = string.Empty; // Purchase or Supply
 
     [Required]
-    public string OrderType { get; set; } = string.Empty; // Purchase or Supply
+    public decimal TotalAmount { get; set; }
 }
 
 /// <summary>

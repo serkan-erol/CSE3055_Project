@@ -36,7 +36,7 @@ namespace Kismet.Entities.Models {
         public Order Order { get; set; } = null!;
 
         [Required]
-        [Column("TransactionType", TypeName = "nvarchar(10)")]
+        [Column("TransactionType", TypeName = "nvarchar(8)")]
         public string TransactionType { get; set; } = string.Empty;
 
         [Required]

@@ -98,7 +98,7 @@ public class BillingRepository : IBillingRepository
         var billingId = await connection.QuerySingleAsync<int>(
             new CommandDefinition(SqlQueries.Billing.InsertBilling, dto, cancellationToken: cancellationToken));
         
-        // Use the existing method to retrieve the billing, just like Customer/Employee do
+        // Use the existing method to retrieve the billing
         return await GetBillingByIdForCustomerAsync(dto.CustomerID, billingId, cancellationToken);
     }
 

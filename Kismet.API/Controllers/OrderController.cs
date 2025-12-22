@@ -12,14 +12,20 @@ public class OrderController : ControllerBase
     private readonly IOrderRepository _orderRepository;
     private readonly ICustomerRepository _customerRepository;
     private readonly IEmployeeRepository _employeeRepository;
+    private readonly IFinancialTransactionRepository _financialTransactionRepository;
+    private readonly IBillingRepository _billingRepository;
 
     public OrderController(IOrderRepository orderRepository, 
                            ICustomerRepository customerRepository,
-                           IEmployeeRepository employeeRepository)
+                           IEmployeeRepository employeeRepository,
+                           IFinancialTransactionRepository financialTransactionRepository,
+                           IBillingRepository billingRepository)
     {
         _orderRepository = orderRepository;
         _customerRepository = customerRepository;
         _employeeRepository = employeeRepository;
+        _financialTransactionRepository = financialTransactionRepository;
+        _billingRepository = billingRepository;
     }
 
     /// <summary>
@@ -84,8 +90,8 @@ public class OrderController : ControllerBase
     /// <summary>
     /// Get order by ID for a customer to be seen by the customer
     /// </summary>
-    [HttpGet("{orderId:int}/{customerId:int}/order-by-id/for-customers")]
-    public async Task<IActionResult> GetOrderByIdForCustomerAsync(int orderId, int customerId, CancellationToken cancellationToken)
+    [HttpGet("{customerId:int}/{orderId:int}/order-by-id/for-customers")]
+    public async Task<IActionResult> GetOrderByIdForCustomerAsync(int customerId, int orderId, CancellationToken cancellationToken)
     {
         try
         {
@@ -97,7 +103,7 @@ public class OrderController : ControllerBase
             }
             
             // Get the order by ID for the customer
-            var order = await _orderRepository.GetOrderByOrderIdForCustomerAsync(orderId, customerId, cancellationToken);
+            var order = await _orderRepository.GetOrderByIdForCustomerAsync(customerId, orderId, cancellationToken);
             
             // Check if order not found
             if (order is null)
@@ -118,12 +124,12 @@ public class OrderController : ControllerBase
     /// Get order by ID for employees to see
     /// </summary>
     [HttpGet("{orderId:int}/order-by-id/for-employees")]
-    public async Task<IActionResult> GetOrderByOrderIdForEmployeeAsync(int orderId, CancellationToken cancellationToken)
+    public async Task<IActionResult> GetOrderByIdForEmployeeAsync(int orderId, CancellationToken cancellationToken)
     {
         try
         {
             // Get the order by ID
-            var order = await _orderRepository.GetOrderByOrderIdForEmployeeAsync(orderId, cancellationToken);
+            var order = await _orderRepository.GetOrderByIdForEmployeeAsync(orderId, cancellationToken);
             
             // Check if order not found
             if (order is null)
@@ -186,6 +192,12 @@ public class OrderController : ControllerBase
                 return BadRequest(ModelState);
             }
 
+            //aaa Check if the CustomerID in the DTO matches the CustomerID in the URL
+            //if (dto.CustomerID != customerId)
+            //{
+            //    return BadRequest(new { error = "Customer ID mismatch" });
+            //}
+
             // Check if the customer exists before creating the order
             var customer = await _customerRepository.GetByIdDtoAsync(customerId, cancellationToken);
             if (customer is null)
@@ -198,6 +210,54 @@ public class OrderController : ControllerBase
 
             // Create the order
             var order = await _orderRepository.CreateOrderAsync(dto, cancellationToken);
+
+            // Create the associated financial transaction
+            var financialTransactionDto = new CreateFTDto
+            {
+                CustomerID = customerId,
+                BillingID = 0,
+                OrderID = order.OrderID,
+                TransactionType = dto.OrderType,
+                TotalAmount = dto.TotalAmount,
+                TransactionDate = DateTime.UtcNow.Date.AddDays(-1),
+            };
+
+            // Find or create a suitable BillingID for the FinancialTransaction
+            // Check if there are any suitable Billing entries for the FT
+            var suitableBillingEntry = await _financialTransactionRepository.FindSuitableBillingEntryForFTAsync(financialTransactionDto, cancellationToken);
+            
+            // If there is not any, create a new Billing entry for the FT
+            if (suitableBillingEntry is null)
+            {
+
+                // Create a new Billing entry for the FT
+                var newBillingDto = new CreateBillingDto
+                {
+                    CustomerID = customerId,
+                    BillingType = financialTransactionDto.TransactionType,
+                    InvoiceNumber = Guid.NewGuid().ToString(), // Generate a unique invoice number
+                    TotalDue = financialTransactionDto.TotalAmount,
+                    BillingDate = financialTransactionDto.TransactionDate,
+                };
+
+                // Create the new Billing entry and set the BillingID in the DTO
+                var newBilling = await _billingRepository.CreateBillingAsync(newBillingDto, cancellationToken);
+                financialTransactionDto.BillingID = newBilling.BillingID;
+            }
+            else
+            {
+                // If the given BillingID is suitable, set the BillingID in the DTO
+                financialTransactionDto.BillingID = suitableBillingEntry.BillingID;
+                var updateBillingDto = new UpdateBillingDto
+                {
+                    BillingID = suitableBillingEntry.BillingID,
+                    TotalDue = dto.TotalAmount,
+                };
+                await _billingRepository.UpdateBillingAsync(customerId, suitableBillingEntry.BillingID, updateBillingDto, cancellationToken);
+            }
+
+            // Create the financial transaction
+            await _financialTransactionRepository.CreateFTAsync(financialTransactionDto, cancellationToken);
 
             // Return the order
             return Ok(order);
@@ -229,7 +289,7 @@ public class OrderController : ControllerBase
                 return NotFound(new { error = "Employee not found" });
             }
             // Check if the order exists
-            var order = await _orderRepository.GetOrderByOrderIdForEmployeeAsync(dto.OrderID, cancellationToken);
+            var order = await _orderRepository.GetOrderByIdForEmployeeAsync(dto.OrderID, cancellationToken);
             if (order is null)
             {
                 return NotFound(new { error = "Order not found" });
@@ -306,7 +366,7 @@ public class OrderController : ControllerBase
             }
 
             // Check if the order exists
-            var order = await _orderRepository.GetOrderByOrderIdForEmployeeAsync(dto.OrderID, cancellationToken);
+            var order = await _orderRepository.GetOrderByIdForEmployeeAsync(dto.OrderID, cancellationToken);
             if (order is null)
             {
                 return NotFound(new { error = "Order not found" });
@@ -343,7 +403,7 @@ public class OrderController : ControllerBase
         try
         {
             // Check if the order exists
-            var order = await _orderRepository.GetOrderByOrderIdForEmployeeAsync(orderId, cancellationToken);
+            var order = await _orderRepository.GetOrderByIdForEmployeeAsync(orderId, cancellationToken);
             if (order is null)
             {
                 return NotFound(new { error = "Order not found" });
@@ -370,7 +430,7 @@ public class OrderController : ControllerBase
         try
         {
             // Check if the order exists
-            var order = await _orderRepository.GetOrderByOrderIdForEmployeeAsync(orderId, cancellationToken);
+            var order = await _orderRepository.GetOrderByIdForEmployeeAsync(orderId, cancellationToken);
             if (order is null)
             {
                 return NotFound(new { error = "Order not found" });
@@ -398,7 +458,7 @@ public class OrderController : ControllerBase
         try
         {
             // Check if the order exists
-            var order = await _orderRepository.GetOrderByOrderIdForEmployeeAsync(orderId, cancellationToken);
+            var order = await _orderRepository.GetOrderByIdForEmployeeAsync(orderId, cancellationToken);
             if (order is null)
             {
                 return NotFound(new { error = "Order not found" });
