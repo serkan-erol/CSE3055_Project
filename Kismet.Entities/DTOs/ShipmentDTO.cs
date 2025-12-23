@@ -116,7 +116,7 @@ public class UpdateCustomsDocRefDto
 }
 
 /// <summary>
-/// DTO for locking/unlocking shipment
+/// DTO for locking shipment
 /// </summary>
 public class LockShipmentDto
 {

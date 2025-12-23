@@ -14,6 +14,22 @@ public class ShipmentController : ControllerBase
     private readonly IShipmentRepository _shipmentRepository;
     private readonly ILogger<ShipmentController> _logger;
 
+    // Constants for error messages
+    private const string ShipmentNotFoundMessage = "Shipment not found";
+    private const string ShipmentNotFoundLogMessage = "Shipment {ShipmentId} not found";
+    private const string ErrorGettingShipmentsMessage = "An error occurred while retrieving shipments";
+    private const string ErrorGettingShipmentMessage = "An error occurred while retrieving shipment";
+    private const string ErrorShippingOrderMessage = "An error occurred while shipping the order";
+    private const string ErrorUpdatingDeliveryDateMessage = "An error occurred while updating delivery date";
+    private const string ErrorUpdatingShipmentStatusMessage = "An error occurred while updating shipment status";
+    private const string ErrorSettingActualDeliveryMessage = "An error occurred while setting actual delivery date";
+    private const string ErrorUpdatingCustomsDocMessage = "An error occurred while updating customs document";
+    private const string ErrorLockingShipmentMessage = "An error occurred while locking shipment";
+    private const string ErrorRetrievingStatusMessage = "An error occurred while retrieving status";
+    private const string ShipmentLockedMessage = "Cannot update delivery date. Shipment is locked.";
+    private const string ShipmentLockedStatusMessage = "Cannot update status. Shipment is locked.";
+    private const string ShipmentLockedActualDeliveryMessage = "Cannot set delivery date. Shipment is locked.";
+
     public ShipmentController(
         IShipmentRepository shipmentRepository,
         ILogger<ShipmentController> logger)
@@ -37,7 +53,7 @@ public class ShipmentController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting shipments for order {OrderId}", orderId);
-            return StatusCode(500, "An error occurred while retrieving shipments");
+            return StatusCode(500, ErrorGettingShipmentsMessage);
         }
     }
 
@@ -55,13 +71,13 @@ public class ShipmentController : ControllerBase
         }
         catch (InvalidOperationException ex)
         {
-            _logger.LogWarning(ex, "Shipment {ShipmentId} not found", shipmentId);
-            return NotFound(new { message = "Shipment not found" });
+            _logger.LogWarning(ex, ShipmentNotFoundLogMessage, shipmentId);
+            return NotFound(new { message = ShipmentNotFoundMessage });
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting shipment {ShipmentId}", shipmentId);
-            return StatusCode(500, "An error occurred while retrieving shipment");
+            return StatusCode(500, ErrorGettingShipmentMessage);
         }
     }
 
@@ -105,7 +121,7 @@ public class ShipmentController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error shipping order {OrderId}", orderId);
-            return StatusCode(500, "An error occurred while shipping the order");
+            return StatusCode(500, ErrorShippingOrderMessage);
         }
     }
 
@@ -127,7 +143,7 @@ public class ShipmentController : ControllerBase
             var isLocked = await _shipmentRepository.CheckIfShipmentIsLockedAsync(shipmentId, cancellationToken);
             if (isLocked)
             {
-                return BadRequest(new { message = "Cannot update delivery date. Shipment is locked." });
+                return BadRequest(new { message = ShipmentLockedMessage });
             }
 
             const int employeeId = 2;
@@ -139,13 +155,13 @@ public class ShipmentController : ControllerBase
         }
         catch (InvalidOperationException ex)
         {
-            _logger.LogWarning(ex, "Shipment {ShipmentId} not found", shipmentId);
-            return NotFound(new { message = "Shipment not found" });
+            _logger.LogWarning(ex, ShipmentNotFoundLogMessage, shipmentId);
+            return NotFound(new { message = ShipmentNotFoundMessage });
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error updating delivery date for shipment {ShipmentId}", shipmentId);
-            return StatusCode(500, "An error occurred while updating delivery date");
+            return StatusCode(500, ErrorUpdatingDeliveryDateMessage);
         }
     }
 
@@ -167,7 +183,7 @@ public class ShipmentController : ControllerBase
             var isLocked = await _shipmentRepository.CheckIfShipmentIsLockedAsync(shipmentId, cancellationToken);
             if (isLocked)
             {
-                return BadRequest(new { message = "Cannot update status. Shipment is locked." });
+                return BadRequest(new { message = ShipmentLockedStatusMessage });
             }
 
             dto.ShipmentID = shipmentId;
@@ -177,13 +193,13 @@ public class ShipmentController : ControllerBase
         }
         catch (InvalidOperationException ex)
         {
-            _logger.LogWarning(ex, "Shipment {ShipmentId} not found", shipmentId);
-            return NotFound(new { message = "Shipment not found" });
+            _logger.LogWarning(ex, ShipmentNotFoundLogMessage, shipmentId);
+            return NotFound(new { message = ShipmentNotFoundMessage });
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error updating status for shipment {ShipmentId}", shipmentId);
-            return StatusCode(500, "An error occurred while updating shipment status");
+            return StatusCode(500, ErrorUpdatingShipmentStatusMessage);
         }
     }
 
@@ -205,7 +221,7 @@ public class ShipmentController : ControllerBase
             var isLocked = await _shipmentRepository.CheckIfShipmentIsLockedAsync(shipmentId, cancellationToken);
             if (isLocked)
             {
-                return BadRequest(new { message = "Cannot set delivery date. Shipment is locked." });
+                return BadRequest(new { message = ShipmentLockedActualDeliveryMessage });
             }
 
             dto.ShipmentID = shipmentId;
@@ -225,13 +241,13 @@ public class ShipmentController : ControllerBase
         }
         catch (InvalidOperationException ex)
         {
-            _logger.LogWarning(ex, "Shipment {ShipmentId} not found", shipmentId);
-            return NotFound(new { message = "Shipment not found" });
+            _logger.LogWarning(ex, ShipmentNotFoundLogMessage, shipmentId);
+            return NotFound(new { message = ShipmentNotFoundMessage });
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error setting actual delivery date for shipment {ShipmentId}", shipmentId);
-            return StatusCode(500, "An error occurred while setting actual delivery date");
+            return StatusCode(500, ErrorSettingActualDeliveryMessage);
         }
     }
 
@@ -256,13 +272,13 @@ public class ShipmentController : ControllerBase
         }
         catch (InvalidOperationException ex)
         {
-            _logger.LogWarning(ex, "Shipment {ShipmentId} not found", shipmentId);
-            return NotFound(new { message = "Shipment not found" });
+            _logger.LogWarning(ex, ShipmentNotFoundLogMessage, shipmentId);
+            return NotFound(new { message = ShipmentNotFoundMessage });
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error updating customs doc for shipment {ShipmentId}", shipmentId);
-            return StatusCode(500, "An error occurred while updating customs document");
+            return StatusCode(500, ErrorUpdatingCustomsDocMessage);
         }
     }
 
@@ -282,39 +298,13 @@ public class ShipmentController : ControllerBase
         }
         catch (InvalidOperationException ex)
         {
-            _logger.LogWarning(ex, "Shipment {ShipmentId} not found", shipmentId);
-            return NotFound(new { message = "Shipment not found" });
+            _logger.LogWarning(ex, ShipmentNotFoundLogMessage, shipmentId);
+            return NotFound(new { message = ShipmentNotFoundMessage });
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error locking shipment {ShipmentId}", shipmentId);
-            return StatusCode(500, "An error occurred while locking shipment");
-        }
-    }
-
-    /// <summary>
-    /// Unlock a shipment (employees only)
-    /// </summary>
-    /// <param name="shipmentId">The shipment ID</param>
-    ///[Authorize(Roles = EmployeeRole)]
-    [HttpPost("{shipmentId}/unlock")]
-    public async Task<IActionResult> UnlockShipment(int shipmentId, CancellationToken cancellationToken)
-    {
-        try
-        {
-            var dto = new LockShipmentDto { ShipmentID = shipmentId };
-            var shipment = await _shipmentRepository.UnlockShipmentAsync(dto, cancellationToken);
-            return Ok(new { message = "Shipment unlocked successfully", shipment });
-        }
-        catch (InvalidOperationException ex)
-        {
-            _logger.LogWarning(ex, "Shipment {ShipmentId} not found", shipmentId);
-            return NotFound(new { message = "Shipment not found" });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error unlocking shipment {ShipmentId}", shipmentId);
-            return StatusCode(500, "An error occurred while unlocking shipment");
+            return StatusCode(500, ErrorLockingShipmentMessage);
         }
     }
 
@@ -334,7 +324,7 @@ public class ShipmentController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting status display name for shipment {ShipmentId}", shipmentId);
-            return StatusCode(500, "An error occurred while retrieving status");
+            return StatusCode(500, ErrorRetrievingStatusMessage);
         }
     }
 }

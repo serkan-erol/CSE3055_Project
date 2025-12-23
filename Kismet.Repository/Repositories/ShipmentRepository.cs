@@ -170,22 +170,6 @@ public class ShipmentRepository : IShipmentRepository
     }
 
     /// <summary>
-    /// Unlock a shipment to allow modifications
-    /// </summary>
-    public async Task<ShipmentResponseToEmployeeDto> UnlockShipmentAsync(LockShipmentDto dto, CancellationToken cancellationToken = default)
-    {
-        using var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken);
-
-        await connection.ExecuteAsync(
-            new CommandDefinition(
-                SqlQueries.Shipment.UnlockShipment, 
-                dto, 
-                cancellationToken: cancellationToken));
-
-        return await GetShipmentByIdForEmployeeAsync(dto.ShipmentID, cancellationToken);
-    }
-
-    /// <summary>
     /// Check if a shipment is locked
     /// </summary>
     public async Task<bool> CheckIfShipmentIsLockedAsync(int shipmentId, CancellationToken cancellationToken = default)

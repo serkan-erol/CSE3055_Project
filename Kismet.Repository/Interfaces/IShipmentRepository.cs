@@ -14,7 +14,6 @@ public interface IShipmentRepository
     Task<ShipmentResponseToEmployeeDto> SetActualDeliveryDateAsync(SetActualDeliveryDateDto dto, CancellationToken cancellationToken = default);
     Task<ShipmentResponseToEmployeeDto> UpdateCustomsDocRefAsync(UpdateCustomsDocRefDto dto, CancellationToken cancellationToken = default);
     Task<ShipmentResponseToEmployeeDto> LockShipmentAsync(LockShipmentDto dto, CancellationToken cancellationToken = default);
-    Task<ShipmentResponseToEmployeeDto> UnlockShipmentAsync(LockShipmentDto dto, CancellationToken cancellationToken = default);
     Task<bool> CheckIfShipmentIsLockedAsync(int shipmentId, CancellationToken cancellationToken = default);
     Task<ShipmentStatus> GetShipmentStatusByIdAsync(int shipmentId, CancellationToken cancellationToken = default);
     Task<string> GetShipmentStatusDisplayNameByIdAsync(int shipmentId, CancellationToken cancellationToken = default);
