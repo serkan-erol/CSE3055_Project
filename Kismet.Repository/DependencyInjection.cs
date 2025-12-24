@@ -18,9 +18,14 @@ public static class DependencyInjection
         //aaa services.AddScoped<ITreasuryRepository, TreasuryRepository>();
         services.AddScoped<IPaymentRepository, PaymentRepository>();
         //aaa services.AddScoped<IShipmentRepository, ShipmentRepository>();
-        //aaa services.AddScoped<IFabricRepository, FabricRepository>();
+        //aaa services.AddScoped<IFinancialTransactionRepository, FinancialTransactionRepository>();
+        services.AddScoped<ITreasuryRepository, TreasuryRepository>();
+        services.AddScoped<ICustomerPaymentRepository, CustomerPaymentRepository>();
+        //aaa services.AddScoped<IPaymentRepository, PaymentRepository>();
+        services.AddScoped<IShipmentRepository, ShipmentRepository>();
+        services.AddScoped<IFabricRepository, FabricRepository>();
         //aaa services.AddScoped<IUnitPriceRepository, UnitPriceRepository>();
-        //aaa services.AddScoped<IBatchRepository, BatchRepository>();
+        services.AddScoped<IBatchRepository, BatchRepository>();
         return services;
     }
 }
