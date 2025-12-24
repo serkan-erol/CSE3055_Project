@@ -21,6 +21,21 @@ CREATE TABLE dbo.[User] (
     LastUpdatedAt       datetime2 NULL
 );
 
+-- Session Table --
+CREATE TABLE dbo.[Session] (
+    SessionID             int IDENTITY PRIMARY KEY,
+    UserID                int NOT NULL,
+    AccessToken           nvarchar(500) NULL,
+    RefreshToken          nvarchar(500) NOT NULL,
+    ATExpiresAt           datetime2 NULL,
+    RTExpiresAt           datetime2 NOT NULL,
+    CreatedAt             datetime2 NOT NULL DEFAULT sysdatetime(),
+    LastUpdatedAt         datetime2 NULL,
+
+    CONSTRAINT FK_Session_User
+        FOREIGN KEY (UserID) REFERENCES dbo.[User](UserID)
+);
+
 -- Unique index to support the foreing key references for the Employee and the Customer tables
 CREATE UNIQUE INDEX UQ_User_UserID_UserType ON dbo.[User](UserID, UserType);
 
@@ -90,8 +105,8 @@ CREATE TABLE dbo.[Billing] (
     -- 'Purchase' for the customer buying from us and 'Supply' for us buying from the customer
     BillingType      nvarchar(8) NOT NULL CHECK (BillingType IN ('Purchase', 'Supply')),
     InvoiceNumber    nvarchar(50) NOT NULL UNIQUE,
-    TotalDue         decimal(18, 2) NOT NULL,
-    TotalPaid        decimal(18, 2) NOT NULL DEFAULT 0.00,
+    TotalDue         decimal(18, 2) NOT NULL CHECK (TotalDue > 0),
+    TotalPaid        decimal(18, 2) NOT NULL DEFAULT 0.00 CHECK (TotalPaid >= 0),
     RemainingBalance AS (TotalDue - TotalPaid) PERSISTED CHECK (RemainingBalance >= 0),
     PaymentTerms     nvarchar(255) NULL,
     -- BillingDate is set to 6 months from the current date by default
@@ -115,7 +130,7 @@ CREATE TABLE dbo.[Order] (
     OrderNumber     nvarchar(50) NOT NULL DEFAULT 'Order00000',
     -- 'Purchase' for the customer buying from us and 'Supply' for us buying from the customer
     OrderType       nvarchar(8) NOT NULL CHECK (OrderType IN ('Purchase', 'Supply')),
-    TotalAmount     decimal(18, 2) NOT NULL DEFAULT 0.00,
+    TotalAmount     decimal(18, 2) NOT NULL CHECK (TotalAmount > 0),
     -- 0 = Pending, 1 = Approved, 2 = Shipped, 3 = Delivered, and 4 = Cancelled
     OrderStatus     int NOT NULL DEFAULT 0 CHECK (OrderStatus BETWEEN 0 AND 4),
     IsApproved      bit NOT NULL DEFAULT 0,
@@ -123,7 +138,7 @@ CREATE TABLE dbo.[Order] (
     ApprovalDate    datetime2 NULL,
     IsLocked        bit NOT NULL DEFAULT 0,
     LockedAt        datetime2 NULL,
-    OrderDate       datetime2 NOT NULL DEFAULT sysdatetime(),    
+    OrderDate       datetime2 NOT NULL DEFAULT sysdatetime(),
     LastUpdatedAt   datetime2 NULL,
 
     CONSTRAINT FK_Order_Customer
@@ -141,9 +156,9 @@ CREATE TABLE dbo.[FinancialTransaction] (
     BillingID           int NOT NULL,
     OrderID             int NOT NULL,
     -- 'Purchase' for the customer paying us and 'Supply' for us paying the customer
-    TransactionType     nvarchar(10) NOT NULL CHECK (TransactionType IN ('Purchase', 'Supply')),
-    TotalAmount         decimal(18, 2) NOT NULL,
-    TotalPaid           decimal(18, 2) NOT NULL DEFAULT 0.00,
+    TransactionType     nvarchar(8) NOT NULL CHECK (TransactionType IN ('Purchase', 'Supply')),
+    TotalAmount         decimal(18, 2) NOT NULL CHECK (TotalAmount > 0),
+    TotalPaid           decimal(18, 2) NOT NULL DEFAULT 0.00 CHECK (TotalPaid >= 0),
     RemainingBalance    AS (TotalAmount - TotalPaid) PERSISTED CHECK (RemainingBalance >= 0),
     -- 0 = Unpaid, 1 = Partial, 2 = Paid
     PaymentStatus       int NOT NULL DEFAULT 0 CHECK (PaymentStatus BETWEEN 0 AND 2), 
@@ -181,9 +196,9 @@ CREATE TABLE dbo.[Payment] (
     BillingID        int NOT NULL,
     FTransactionID   int NOT NULL,
     PaymentAmount    decimal(18, 2) NOT NULL CHECK (PaymentAmount > 0),
-    -- 'Receive' for the customer paying us (associated with a Purchase Order / FinancialTransaction) 
-    -- and 'Send' for us paying the customer (associated with a Supply Order / FinancialTransaction)
-    PaymentType      nvarchar(50) NOT NULL CHECK (PaymentType IN ('Receive', 'Send')), 
+    -- 'Purchase' for the customer paying us (associated with a Purchase type Order / FinancialTransaction) 
+    -- and 'Supply' for us paying the customer (associated with a Supply type Order / FinancialTransaction)
+    PaymentType      nvarchar(8) NOT NULL CHECK (PaymentType IN ('Purchase', 'Supply')),
     PaymentDate      datetime2 NOT NULL DEFAULT sysdatetime(),
     PaymentMethod    nvarchar(50) NULL,     -- Cash, credit card, debit card etc.
     ReferenceNumber  nvarchar(100) NULL,    -- We can use a function and a trigger to generate a reference number within set parameters
@@ -199,7 +214,7 @@ CREATE TABLE dbo.[Payment] (
 -- Shipment --
 CREATE TABLE dbo.[Shipment] (
     ShipmentID           int IDENTITY PRIMARY KEY,
-    OrderID             int NOT NULL,
+    OrderID              int NOT NULL,
     CustomsDocRef        nvarchar(100) NULL,
     -- 0 = Pending, 1 = In Transit, 2 = Delivered, and 3 = Failed
     ShipmentStatus       int NOT NULL DEFAULT 0 CHECK (ShipmentStatus BETWEEN 0 AND 3),
@@ -225,10 +240,10 @@ CREATE TABLE dbo.[Fabric] (
     FabricType      nvarchar(50) NOT NULL,
     Composition     nvarchar(100) NULL,
     Color           nvarchar(50) NULL,
-    WeightPerUnit   decimal(10,2) NULL,
+    WeightPerUnit   decimal(18, 2) NULL CHECK (WeightPerUnit > 0),
     -- Stock unit is always rolls. It is assumed all the roles have the same length and width
     StockQuantity   int NOT NULL DEFAULT 0,
-    UnitPrice int NOT NULL DEFAULT 10,
+    UnitPrice       decimal(18, 2) NOT NULL CHECK (UnitPrice > 0),
     Description     nvarchar(255) NULL
 );
 
@@ -386,7 +401,7 @@ GO
 
 --------------------------------------------------------------------------------------------------------------------------------
 
---Procedure to update BillingStatus based on TotalDue and TotalPaid
+-- Procedure to update BillingStatus based on TotalDue and TotalPaid
 CREATE PROCEDURE dbo.Update_BillingStatus
     @BillingID int
 AS
@@ -403,8 +418,26 @@ BEGIN
     WHERE BillingID = @BillingID;
 END;
 GO
+
+-- Procedure to update PaymentStatus of FT based on PaymentAmount and TotalPaid
+CREATE PROCEDURE dbo.Update_FTPaymentStatus
+    @FTransactionID int
+AS
+BEGIN
+    SET NOCOUNT ON;
+      UPDATE dbo.[FinancialTransaction]
+    SET PaymentStatus = CASE
+        WHEN TotalAmount = TotalPaid THEN 2
+        WHEN TotalAmount > TotalPaid THEN 1
+        WHEN TotalPaid = 0 THEN 0
+        ELSE -1 -- This should never happen! It is just a fallback to see if there are any erros in the logic
+    END
+    WHERE FTransactionID = @FTransactionID;
+END;
+GO
+
 --------------------------------------------------------------------------------------------------------------
----Procedure to ship the placed orders
+-- Procedure to ship the placed orders
 CREATE PROCEDURE dbo.ShipOrder
     @OrderID int,
     @EmployeeID int
@@ -637,7 +670,7 @@ BEGIN
     BEGIN TRY
         DECLARE @OrderID int;
 
-        -- 1️⃣ Create order
+        -- 1. Create order
         INSERT INTO dbo.[Order] (
             CustomerID,
             OrderType
@@ -649,12 +682,12 @@ BEGIN
 
         SET @OrderID = SCOPE_IDENTITY();
 
-        -- 2️⃣ Update stock
+        -- 2. Update stock
         UPDATE dbo.[Fabric]
         SET StockQuantity = StockQuantity - @TotalFabricUnits
         WHERE FabricID = @FabricID;
 
-        -- 3️⃣ Create batches
+        -- 3. Create batches
         EXEC dbo.CreateBatches
             @OrderID = @OrderID,
             @FabricID = @FabricID,
@@ -912,7 +945,192 @@ BEGIN
     END
 END;
 GO
------------------------------------------------------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------------------------------------------------------
+
+-- Trigger to update Billing.TotalPaid when a FinancialTransaction is inserted
+CREATE TRIGGER dbo.trg_Update_Billing_TotalPaid_On_FT_Insert
+
+ON dbo.[FinancialTransaction]
+AFTER INSERT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    -- Update Billing.TotalPaid for each affected BillingID
+    UPDATE b
+    SET b.TotalPaid = (
+        SELECT ISNULL(SUM(ft.TotalPaid), 0)
+        FROM dbo.[FinancialTransaction] ft
+        WHERE ft.BillingID = b.BillingID
+    ),
+    b.LastUpdatedAt = sysdatetime()
+    FROM dbo.[Billing] b
+    INNER JOIN inserted i ON b.BillingID = i.BillingID;
+    
+    -- Update BillingStatus for affected Billings
+    DECLARE @BillingID int;
+    DECLARE billing_cursor CURSOR FOR
+        SELECT DISTINCT BillingID FROM inserted;
+    
+    OPEN billing_cursor;
+    FETCH NEXT FROM billing_cursor INTO @BillingID;
+    
+    WHILE @@FETCH_STATUS = 0
+    BEGIN
+        EXEC dbo.Update_BillingStatus @BillingID = @BillingID;
+        FETCH NEXT FROM billing_cursor INTO @BillingID;
+    END
+    
+    CLOSE billing_cursor;
+    DEALLOCATE billing_cursor;
+END;
+GO
+
+--------------------------------------------------------------------------------------------------------------------------------
+
+-- Trigger to update Billing.TotalPaid when a FinancialTransaction's TotalPaid is updated
+CREATE TRIGGER dbo.trg_Update_Billing_TotalPaid_On_FT_Update
+ON dbo.[FinancialTransaction]
+AFTER UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    -- Only update when TotalPaid changes
+    IF EXISTS (
+        SELECT 1 FROM inserted i
+        INNER JOIN deleted d ON i.FTransactionID = d.FTransactionID
+        WHERE i.TotalPaid <> d.TotalPaid
+    )
+    BEGIN
+        -- Update Billing.TotalPaid for each affected BillingID
+        UPDATE b
+        SET b.TotalPaid = (
+            SELECT ISNULL(SUM(ft.TotalPaid), 0)
+            FROM dbo.[FinancialTransaction] ft
+            WHERE ft.BillingID = b.BillingID
+        ),
+        b.LastUpdatedAt = sysdatetime()
+        FROM dbo.[Billing] b
+        INNER JOIN inserted i ON b.BillingID = i.BillingID;
+        
+        -- Also update Billing.TotalPaid for BillingIDs from deleted records (in case BillingID changed)
+        UPDATE b
+        SET b.TotalPaid = (
+            SELECT ISNULL(SUM(ft.TotalPaid), 0)
+            FROM dbo.[FinancialTransaction] ft
+            WHERE ft.BillingID = b.BillingID
+        ),
+        b.LastUpdatedAt = sysdatetime()
+        FROM dbo.[Billing] b
+        INNER JOIN deleted d ON b.BillingID = d.BillingID
+        WHERE NOT EXISTS (SELECT 1 FROM inserted i WHERE i.BillingID = d.BillingID);
+        
+        -- Update BillingStatus for affected Billings
+        DECLARE @BillingID int;
+        DECLARE billing_cursor CURSOR FOR
+            SELECT DISTINCT BillingID FROM inserted
+            UNION
+            SELECT DISTINCT BillingID FROM deleted;
+        
+        OPEN billing_cursor;
+        FETCH NEXT FROM billing_cursor INTO @BillingID;
+        
+        WHILE @@FETCH_STATUS = 0
+        BEGIN
+            EXEC dbo.Update_BillingStatus @BillingID = @BillingID;
+            FETCH NEXT FROM billing_cursor INTO @BillingID;
+        END
+        
+        CLOSE billing_cursor;
+        DEALLOCATE billing_cursor;
+    END
+END;
+GO
+
+--------------------------------------------------------------------------------------------------------------------------------
+
+-- Trigger to update Billing.TotalPaid when a FinancialTransaction is deleted
+-- This is redundant. We do NOT plan to delete FinancialTransactions.
+CREATE TRIGGER dbo.trg_Update_Billing_TotalPaid_On_FT_Delete
+ON dbo.[FinancialTransaction]
+AFTER DELETE
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    -- Update Billing.TotalPaid for each affected BillingID
+    UPDATE b
+    SET b.TotalPaid = (
+        SELECT ISNULL(SUM(ft.TotalPaid), 0)
+        FROM dbo.[FinancialTransaction] ft
+        WHERE ft.BillingID = b.BillingID
+    ),
+    b.LastUpdatedAt = sysdatetime()
+    FROM dbo.[Billing] b
+    INNER JOIN deleted d ON b.BillingID = d.BillingID;
+    
+    -- Update BillingStatus for affected Billings
+    DECLARE @BillingID int;
+    DECLARE billing_cursor CURSOR FOR
+        SELECT DISTINCT BillingID FROM deleted;
+    
+    OPEN billing_cursor;
+    FETCH NEXT FROM billing_cursor INTO @BillingID;
+    
+    WHILE @@FETCH_STATUS = 0
+    BEGIN
+        EXEC dbo.Update_BillingStatus @BillingID = @BillingID;
+        FETCH NEXT FROM billing_cursor INTO @BillingID;
+    END
+    
+    CLOSE billing_cursor;
+    DEALLOCATE billing_cursor;
+END;
+GO
+
+--------------------------------------------------------------------------------------------------------------------------------
+
+-- Trigger to update FT.TotalPaid when a Payment with that FT's FK is inserted
+CREATE TRIGGER dbo.trg_Update_FT_TotalPaid_On_Payment_Insert
+ON dbo.[Payment]
+AFTER INSERT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    -- Update FT.TotalPaid for each affected FTransactionID
+    UPDATE ft
+    SET ft.TotalPaid = (
+        SELECT ISNULL(SUM(p.PaymentAmount), 0)
+        FROM dbo.[Payment] p
+        WHERE p.FTransactionID = ft.FTransactionID
+    ),
+    ft.LastUpdatedAt = sysdatetime()
+    FROM dbo.[FinancialTransaction] ft
+    INNER JOIN inserted i ON ft.FTransactionID = i.FTransactionID;
+    
+    -- Update PaymentStatus for affected FinancialTransactions
+    DECLARE @FTransactionID int;
+    DECLARE payment_cursor CURSOR FOR
+        SELECT DISTINCT FTransactionID FROM inserted;
+    
+    OPEN payment_cursor;
+    FETCH NEXT FROM payment_cursor INTO @FTransactionID;
+    
+    WHILE @@FETCH_STATUS = 0
+    BEGIN
+        EXEC dbo.Update_FTPaymentStatus @FTransactionID = @FTransactionID;
+        FETCH NEXT FROM payment_cursor INTO @FTransactionID;
+    END
+    
+    CLOSE payment_cursor;
+    DEALLOCATE payment_cursor;
+END;
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
 -- Trigger to create treasury entries for each financial transaction
 CREATE TRIGGER trg_FinancialTransaction_CreateTreasuryEntry
 ON dbo.[FinancialTransaction]
@@ -920,8 +1138,8 @@ AFTER INSERT
 AS
 BEGIN
     SET NOCOUNT ON;
-
     -- Insert treasury entries for each transaction
+    
     INSERT INTO dbo.[Treasury] (FTransactionID, Amount, Description)
     SELECT 
         FTransactionID,
@@ -933,8 +1151,10 @@ BEGIN
     FROM inserted;
 END
 GO
+
 ---------------------------------------------------------------------------------------------------------------------------------
----Trigger to calculate the order price by doing sum (batchprices)
+
+-- Trigger to calculate the order price by doing sum (batchprices)
 CREATE TRIGGER dbo.trg_UpdateOrderTotal
 ON dbo.[Batch]
 AFTER INSERT, UPDATE, DELETE
