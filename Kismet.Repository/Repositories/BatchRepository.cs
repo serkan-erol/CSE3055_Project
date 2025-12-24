@@ -52,28 +52,30 @@ public class BatchRepository : IBatchRepository
         return batch ?? throw new InvalidOperationException("Batch not found");
     }
 
-   public async Task<CreateBatchesResponseDto> CreateBatchesAsync(
-    CreateBatchesDto dto,
-    CancellationToken cancellationToken = default)
-{
-    using var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken);
+   public async Task<CreateBatchesResponseDto> CreateBatchesAsync(CreateBatchesDto dto, CancellationToken cancellationToken = default)
+    {
+        using var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken);
 
-    var result = await connection.QuerySingleAsync<CreateBatchesResponseDto>(
-        new CommandDefinition(
-            SqlQueries.Batch.CreateBatches,
-            new
-            {
-                OrderID = dto.OrderID,
-                FabricID = dto.FabricID,
-                TotalFabricUnits = dto.TotalFabricUnits,
-                QualityGrade = dto.QualityGrade
-            },
-            cancellationToken: cancellationToken
-        ));
+        // Execute stored procedure
+        await connection.ExecuteAsync(
+            new CommandDefinition(
+                SqlQueries.Batch.CreateBatches,
+                new
+                {
+                    OrderID = dto.OrderID,
+                    FabricID = dto.FabricID,
+                    TotalFabricUnits = dto.TotalFabricUnits,
+                    QualityGrade = dto.QualityGrade
+                },
+                commandType: System.Data.CommandType.StoredProcedure,
+                cancellationToken: cancellationToken));
 
-    return result;
-}
-
+        return new CreateBatchesResponseDto
+        {
+            Success = true,
+            Message = $"Successfully created batches for Order {dto.OrderID} with {dto.TotalFabricUnits} total fabric units"
+        };
+    }
 
     public async Task<IReadOnlyList<BatchResponseToEmployeeDto>> GetUnshippedBatchesByOrderIdAsync(int orderId, CancellationToken cancellationToken = default)
     {

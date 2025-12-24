@@ -520,7 +520,7 @@ END
 GO
 
 --------------------------------------------------------------------------------------------------------------------------------
-CCREATE OR ALTER PROCEDURE dbo.CreateBatches
+CREATE OR ALTER PROCEDURE dbo.CreateBatches
     @OrderID int,
     @FabricID int,
     @TotalFabricUnits int,
@@ -528,6 +528,13 @@ CCREATE OR ALTER PROCEDURE dbo.CreateBatches
 AS
 BEGIN
     SET NOCOUNT ON;
+
+    -- Check if batches already exist for this order
+    IF EXISTS (SELECT 1 FROM dbo.[Batch] WHERE OrderID = @OrderID)
+    BEGIN
+        RAISERROR('already batched !', 16, 1);
+        RETURN;
+    END
 
     IF @TotalFabricUnits < 1
     BEGIN

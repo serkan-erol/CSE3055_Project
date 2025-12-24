@@ -12,7 +12,7 @@ public class BatchResponseToCustomerDto
     public string BatchNumber { get; set; } = string.Empty;
     public int Quantity { get; set; }
     public decimal BatchPrice { get; set; }
-    public DateOnly? ProductionDate { get; set; }
+    public DateTime? ProductionDate { get; set; }
     public string? QualityGrade { get; set; }
 }
 
@@ -28,7 +28,7 @@ public class BatchResponseToEmployeeDto
     public string BatchNumber { get; set; } = string.Empty;
     public int Quantity { get; set; }
     public decimal BatchPrice { get; set; }
-    public DateOnly? ProductionDate { get; set; }
+    public DateTime? ProductionDate { get; set; }
     public string? QualityGrade { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
 }
@@ -52,5 +52,6 @@ public class CreateBatchesDto
 /// </summary>
 public class CreateBatchesResponseDto
 {
-    public int BatchesCreated { get; set; }
+    public bool Success { get; set; }
+    public string Message { get; set; } = string.Empty;
 }
