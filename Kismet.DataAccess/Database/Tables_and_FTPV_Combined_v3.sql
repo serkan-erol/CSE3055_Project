@@ -25,8 +25,8 @@ CREATE TABLE dbo.[User] (
 CREATE TABLE dbo.[Session] (
     SessionID             int IDENTITY PRIMARY KEY,
     UserID                int NOT NULL,
-    AccessToken           nvarchar(255) NULL,
-    RefreshToken          nvarchar(255) NOT NULL,
+    AccessToken           nvarchar(500) NULL,
+    RefreshToken          nvarchar(500) NOT NULL,
     ATExpiresAt           datetime2 NULL,
     RTExpiresAt           datetime2 NOT NULL,
     CreatedAt             datetime2 NOT NULL DEFAULT sysdatetime(),

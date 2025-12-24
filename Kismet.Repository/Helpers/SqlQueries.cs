@@ -84,7 +84,8 @@ public static class SqlQueries
                 s.LastUpdatedAt
             FROM dbo.[Session] s
             INNER JOIN dbo.[User] u ON u.UserID = s.UserID";
-
+        
+        // Query for getting token info
         public const string GetTokenResponseBaseDto = @"
             SELECT 
                 s.AccessToken,
@@ -115,15 +116,21 @@ public static class SqlQueries
                 LastUpdatedAt = sysdatetime()
             WHERE SessionID = @SessionID";
         
-        // Expire the AccessToken by setting it to NULL and setting the ATExpiresAt to the current time
+        // Expire the AccessToken by setting the ATExpiresAt to the current time
         // This can be used to logout a user by expiring the AccessToken
         public const string ExpireAccessToken = @"
             UPDATE dbo.[Session]
             SET 
-                AccessToken = NULL,
                 ATExpiresAt = sysdatetime(),
                 LastUpdatedAt = sysdatetime()
             WHERE SessionID = @SessionID";
+
+        // Check if a session is valid
+        public const string IsSessionValidBase = @"
+            SELECT 
+                CASE WHEN s.ATExpiresAt > sysdatetime() AND s.RTExpiresAt > sysdatetime() THEN 1 ELSE 0 END
+            FROM dbo.[Session] s
+            INNER JOIN dbo.[User] u ON u.UserID = s.UserID";
     }
 
     /// <summary>
@@ -202,6 +209,18 @@ public static class SqlQueries
                 u.LastUpdatedAt
             FROM dbo.[Employee] e
             INNER JOIN dbo.[User] u ON u.UserID = e.EmployeeID AND u.UserType = e.UserType";
+
+        public const string GetEmployeeRole = @"
+            SELECT 
+                e.EmployeeRole
+            FROM dbo.[Employee] e
+            WHERE e.EmployeeID = @EmployeeID";
+
+        public const string GetEmployeeAccessLevel = @"
+            SELECT 
+                e.AccessLevel
+            FROM dbo.[Employee] e
+            WHERE e.EmployeeID = @EmployeeID";
 
         public const string InsertEmployee = @"
             INSERT INTO dbo.[Employee] (EmployeeID, EmployeeRole, AccessLevel)

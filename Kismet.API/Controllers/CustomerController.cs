@@ -1,3 +1,4 @@
+using Kismet.Core.Helpers;
 using Kismet.Entities.DTOs;
 using Kismet.Repository.Interfaces;
 using Microsoft.AspNetCore.Mvc;
@@ -9,10 +10,16 @@ namespace Kismet.API.Controllers;
 public class CustomerController : ControllerBase
 {
     private readonly ICustomerRepository _customerRepository;
+    private readonly ISessionRepository _sessionRepository;
+    private readonly JwtHelper _jwtHelper;
 
-    public CustomerController(ICustomerRepository customerRepository)
+    public CustomerController(ICustomerRepository customerRepository, 
+                              ISessionRepository sessionRepository, 
+                              JwtHelper jwtHelper)
     {
         _customerRepository = customerRepository;
+        _sessionRepository = sessionRepository;
+        _jwtHelper = jwtHelper;
     }
 
     /// <summary>
@@ -74,6 +81,15 @@ public class CustomerController : ControllerBase
             }
 
             var created = await _customerRepository.CreateAsync(dto, cancellationToken);
+
+            // Create a new session for the customer and login
+            var newSession = await _sessionRepository.CreateAsync(new CreateSessionDto
+            {
+                UserID = created.CustomerID,
+                Email = created.ContactEmail,
+                RefreshToken = string.Empty,
+                RTExpiresAt = DateTimeOffset.UtcNow
+            }, cancellationToken);
             
             // Return created customer
             return Created($"/api/customers/{created.CustomerID}", created);

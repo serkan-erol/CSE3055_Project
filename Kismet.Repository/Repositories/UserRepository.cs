@@ -148,16 +148,11 @@ public class UserRepository : IUserRepository
 
         try
         {
-            // Verify old password
-            // Get the user by email and get the password hash from the user
+            // Get the user by email to verify the old password
             var user = await GetByEmailAsync(dto.ContactEmail, cancellationToken) 
                 ?? throw new Exception("User not found");
-            // Verify user ID matches
-            //if (user.UserID != dto.UserID)
-            //{
-            //    throw new Exception("User ID mismatch");
-            //}
 
+            // Verify the old password
             var isOldPasswordValid = BCrypt.Net.BCrypt.Verify(dto.OldPassword, user.PasswordHash);
             if (!isOldPasswordValid)
             {
