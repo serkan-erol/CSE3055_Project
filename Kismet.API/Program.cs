@@ -40,7 +40,7 @@ app.UseSwaggerUI();
 
 app.UseCors(LocalCorsPolicy);
 
-app.UseAuthorization();
+//app.UseAuthorization();
 
 app.MapControllers();
 

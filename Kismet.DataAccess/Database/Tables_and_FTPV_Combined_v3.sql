@@ -161,6 +161,20 @@ CREATE TABLE dbo.[FinancialTransaction] (
         FOREIGN KEY (OrderID) REFERENCES dbo.[Order](OrderID)
 );
 
+-- Treasury --
+CREATE TABLE dbo.[Treasury] (
+    TreasuryID      int IDENTITY PRIMARY KEY,
+    FTransactionID  int NULL,
+    Amount          decimal(18, 2) NOT NULL,
+    ---BalanceAfter    decimal(18, 2) NOT NULL,
+    Description     nvarchar(255) NULL,
+    EntryDate       datetime2 NOT NULL DEFAULT sysdatetime(),
+    LastUpdatedAt   datetime2 NULL,
+
+    CONSTRAINT FK_Treasury_Transaction
+        FOREIGN KEY (FTransactionID) REFERENCES dbo.[FinancialTransaction](FTransactionID)
+);
+
 -- Payment --
 CREATE TABLE dbo.[Payment] (
     PaymentID        int IDENTITY PRIMARY KEY,
@@ -177,20 +191,6 @@ CREATE TABLE dbo.[Payment] (
     CONSTRAINT FK_Payment_Billing
         FOREIGN KEY (BillingID) REFERENCES dbo.[Billing](BillingID),
     CONSTRAINT FK_Payment_Transaction
-        FOREIGN KEY (FTransactionID) REFERENCES dbo.[FinancialTransaction](FTransactionID)
-);
-
--- Treasury --
-CREATE TABLE dbo.[Treasury] (
-    TreasuryID      int IDENTITY PRIMARY KEY,
-    FTransactionID  int NOT NULL,
-    Amount          decimal(18, 2) NOT NULL CHECK (Amount > 0),
-    BalanceAfter    decimal(18, 2) NOT NULL CHECK (BalanceAfter >= 0),
-    Description     nvarchar(255) NULL,
-    EntryDate       datetime2 NOT NULL DEFAULT sysdatetime(),
-    LastUpdatedAt   datetime2 NULL,
-
-    CONSTRAINT FK_Treasury_Transaction
         FOREIGN KEY (FTransactionID) REFERENCES dbo.[FinancialTransaction](FTransactionID)
 );
 
@@ -247,7 +247,7 @@ CREATE TABLE dbo.[UnitPrice] (
 CREATE TABLE dbo.[Batch] (
     BatchID         int IDENTITY PRIMARY KEY,
     OrderID         int NOT NULL,
-    ShipmentID      int NOT NULL,
+    ShipmentID      int NULL,
     FabricID        int NOT NULL,
     BatchNumber     nvarchar(50) NOT NULL UNIQUE,
     Quantity        int NOT NULL,
@@ -258,8 +258,8 @@ CREATE TABLE dbo.[Batch] (
 
     CONSTRAINT FK_Batch_Order
         FOREIGN KEY (OrderID) REFERENCES dbo.[Order](OrderID),
-    CONSTRAINT FK_Batch_Shipment
-        FOREIGN KEY (ShipmentID) REFERENCES dbo.[Shipment](ShipmentID),
+    ---CONSTRAINT FK_Batch_Shipment
+       --- FOREIGN KEY (ShipmentID) REFERENCES dbo.[Shipment](ShipmentID),
     CONSTRAINT FK_Batch_Fabric
         FOREIGN KEY (FabricID) REFERENCES dbo.[Fabric](FabricID)
 );
@@ -421,8 +421,7 @@ CREATE PROCEDURE dbo.Update_FTPaymentStatus
 AS
 BEGIN
     SET NOCOUNT ON;
-    
-    UPDATE dbo.[FinancialTransaction]
+      UPDATE dbo.[FinancialTransaction]
     SET PaymentStatus = CASE
         WHEN TotalAmount = TotalPaid THEN 2
         WHEN TotalAmount > TotalPaid THEN 1
@@ -432,6 +431,122 @@ BEGIN
     WHERE FTransactionID = @FTransactionID;
 END;
 GO
+
+--------------------------------------------------------------------------------------------------------------
+---Procedure to ship the placed orders
+CREATE PROCEDURE dbo.ShipOrder
+    @OrderID int,
+    @EmployeeID int
+AS
+BEGIN
+    SET NOCOUNT ON;
+    -- Check if shipments already exist for this order
+    IF EXISTS (SELECT 1 FROM dbo.[Shipment] WHERE OrderID = @OrderID)
+    BEGIN
+        -- Return existing shipments
+        SELECT 
+            s.ShipmentID,
+            s.ExpectedDeliveryDate,
+            COUNT(b.BatchID) as BatchCount
+        FROM dbo.[Shipment] s
+        LEFT JOIN dbo.[Batch] b ON b.ShipmentID = s.ShipmentID
+        WHERE s.OrderID = @OrderID
+        GROUP BY s.ShipmentID, s.ExpectedDeliveryDate
+        ORDER BY s.ShipmentID;
+        RETURN;
+    END
+
+    -- Get all batches for this order
+    DECLARE @Batches TABLE (BatchID int, RowNum int);
+    INSERT INTO @Batches (BatchID, RowNum)
+    SELECT BatchID, ROW_NUMBER() OVER (ORDER BY BatchID)
+    FROM dbo.[Batch]
+    WHERE OrderID = @OrderID;
+
+    -- Check if there are any batches
+    DECLARE @TotalBatches int = (SELECT COUNT(*) FROM @Batches);
+    IF @TotalBatches = 0
+    BEGIN
+        RAISERROR('No batches found for this order', 16, 1);
+        RETURN;
+    END
+
+    -- Calculate number of shipments needed (10 batches per shipment)
+    DECLARE @MaxBatchesPerShipment int = 10;
+    DECLARE @ShipmentsNeeded int = CEILING(@TotalBatches * 1.0 / @MaxBatchesPerShipment);
+    DECLARE @CurrentShipment int = 1;
+    DECLARE @ShipmentID int;
+    DECLARE @ShipDate date = CAST(GETDATE() AS date);
+    DECLARE @ExpectedDelivery date = DATEADD(day, 5, @ShipDate);
+
+    -- Table to store created shipments for return
+    DECLARE @CreatedShipments TABLE (
+        ShipmentID int,
+        ExpectedDeliveryDate date,
+        BatchCount int
+    );
+
+    BEGIN TRANSACTION;
+    BEGIN TRY
+        -- Create shipments
+        WHILE @CurrentShipment <= @ShipmentsNeeded
+        BEGIN
+            -- Calculate batch range for this shipment
+            DECLARE @StartRow int = ((@CurrentShipment - 1) * @MaxBatchesPerShipment) + 1;
+            DECLARE @EndRow int = @CurrentShipment * @MaxBatchesPerShipment;
+
+            -- Create shipment record
+            INSERT INTO dbo.[Shipment] (OrderID, ShipmentDate, ExpectedDeliveryDate)
+            VALUES (@OrderID, @ShipDate, @ExpectedDelivery);
+            
+            SET @ShipmentID = SCOPE_IDENTITY();
+
+            -- Link batches to this shipment
+            UPDATE b
+            SET b.ShipmentID = @ShipmentID
+            FROM dbo.[Batch] b
+            INNER JOIN @Batches bt ON bt.BatchID = b.BatchID
+            WHERE bt.RowNum BETWEEN @StartRow AND @EndRow;
+
+            -- Store shipment info for return
+            INSERT INTO @CreatedShipments (ShipmentID, ExpectedDeliveryDate, BatchCount)
+            SELECT 
+                @ShipmentID,
+                @ExpectedDelivery,
+                COUNT(*)
+            FROM @Batches
+            WHERE RowNum BETWEEN @StartRow AND @EndRow;
+
+            SET @CurrentShipment = @CurrentShipment + 1;
+        END
+
+        -- Update order status to Shipped (2)
+        UPDATE dbo.[Order]
+        SET OrderStatus = 2
+        WHERE OrderID = @OrderID;
+        
+        EXEC dbo.Update_LastUpdatedAt @Table = 'Order', @ID = @OrderID, @IDColumn = 'OrderID';
+
+        COMMIT TRANSACTION;
+
+        -- Return created shipments
+        SELECT 
+            ShipmentID,
+            ExpectedDeliveryDate,
+            BatchCount
+        FROM @CreatedShipments
+        ORDER BY ShipmentID;
+
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0
+            ROLLBACK TRANSACTION;
+        
+        THROW;
+    END CATCH
+END
+GO
+
 
 --------------------------------------------------------------------------------------------------------------------------------
 ----------------------------------------------------------- TRIGGERS -----------------------------------------------------------
@@ -676,6 +791,7 @@ GO
 
 -- Trigger to update Billing.TotalPaid when a FinancialTransaction is inserted
 CREATE TRIGGER dbo.trg_Update_Billing_TotalPaid_On_FT_Insert
+
 ON dbo.[FinancialTransaction]
 AFTER INSERT
 AS
@@ -853,4 +969,25 @@ BEGIN
     CLOSE payment_cursor;
     DEALLOCATE payment_cursor;
 END;
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+-- Trigger to create treasury entries for each financial transaction
+CREATE TRIGGER trg_FinancialTransaction_CreateTreasuryEntry
+ON dbo.[FinancialTransaction]
+AFTER INSERT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    -- Insert treasury entries for each transaction
+    
+    INSERT INTO dbo.[Treasury] (FTransactionID, Amount, Description)
+    SELECT 
+        FTransactionID,
+        CASE 
+            WHEN TransactionType = 'Purchase' THEN TotalAmount  -- Money in (+)
+            WHEN TransactionType = 'Supply' THEN -TotalAmount   -- Money out (-)
+        END as Amount,
+        'Auto-generated from ' + TransactionType + ' transaction'
+    FROM inserted;
+END
 GO
