@@ -163,6 +163,31 @@ public class FinancialTransactionController : ControllerBase
     }
 
     /// <summary>
+    /// Get PaymentStatus display name by ID
+    /// </summary>
+    [HttpGet("{fTransactionId:int}/get-payment-status-display-name/")]
+    public async Task<IActionResult> GetPaymentStatusDisplayNameAsync(int fTransactionId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            // Check if the payment status exists
+            var ft = await _financialTransactionRepository.GetFTByIdForEmployeeAsync(fTransactionId, cancellationToken);
+            if (ft is null)
+            {
+                return NotFound(new { error = "Financial transaction not found" });
+            }
+            
+            var paymentStatus = ft.PaymentStatus;
+            // Return the payment status display name
+            return Ok(paymentStatus.GetDisplayName());
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    /// <summary>
     /// Create a new financial transaction for a customer
     /// </summary>
     [HttpPost("{customerId:int}/{orderId:int}/create-financial-transaction")]
@@ -293,6 +318,16 @@ public class FinancialTransactionController : ControllerBase
 
             // Create the financial transaction
             var financialTransaction = await _financialTransactionRepository.CreateFTAsync(dto, cancellationToken);
+
+            //aaa This will be un-commented when we implement the Treasury feature
+            // Create the treasury entry for the FT
+            //var treasuryDto = new CreateTreasuryDto
+            //{
+            //    FTransactionID = financialTransaction.FTransactionID,
+            //    Amount = financialTransaction.TotalAmount,
+            //    Description = financialTransaction.Description,
+            //};
+            //var treasury = await _treasuryRepository.CreateTreasuryEntryAsync(treasuryDto, cancellationToken);
 
             // Return the financial transaction
             return Ok(financialTransaction);
