@@ -1,4 +1,5 @@
 using Dapper;
+using BCrypt.Net;
 using Kismet.Core.Data;
 using Kismet.Entities.DTOs;
 using Kismet.Entities.Models;
@@ -42,6 +43,16 @@ public class UserRepository : IUserRepository
             new CommandDefinition(SqlQueries.User.GetUserBase + " WHERE u.UserID = @UserID", 
                 new { UserID = userId }, 
                 cancellationToken: cancellationToken));
+    }
+
+    /// <summary>
+    /// Get user by email
+    /// </summary>
+    public async Task<GetUserByEmailResponseDto?> GetByEmailAsync(string email, CancellationToken cancellationToken = default)
+    {
+        using var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken);
+        return await connection.QueryFirstOrDefaultAsync<GetUserByEmailResponseDto>(
+            new CommandDefinition(SqlQueries.User.GetUserByEmail, new { ContactEmail = email }, cancellationToken: cancellationToken));
     }
 
     /// <summary>
@@ -137,11 +148,30 @@ public class UserRepository : IUserRepository
 
         try
         {
+            // Verify old password
+            // Get the user by email and get the password hash from the user
+            var user = await GetByEmailAsync(dto.ContactEmail, cancellationToken) 
+                ?? throw new Exception("User not found");
+            // Verify user ID matches
+            //if (user.UserID != dto.UserID)
+            //{
+            //    throw new Exception("User ID mismatch");
+            //}
+
+            var isOldPasswordValid = BCrypt.Net.BCrypt.Verify(dto.OldPassword, user.PasswordHash);
+            if (!isOldPasswordValid)
+            {
+                throw new Exception("Invalid old password");
+            }
+            
+            // Hash new password
+            var newPasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.NewPassword);
+
             await connection.ExecuteAsync(
                 new CommandDefinition(SqlQueries.User.UpdateUserPassword, new
                 {
-                    UserID = dto.UserID,
-                    dto.PasswordHash
+                    dto.UserID,
+                    PasswordHash = newPasswordHash
                 }, transaction, cancellationToken: cancellationToken));
 
             await transaction.CommitAsync(cancellationToken);

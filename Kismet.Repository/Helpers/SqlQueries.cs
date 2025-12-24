@@ -27,6 +27,14 @@ public static class SqlQueries
             VALUES (@UserName, @ContactEmail, @ContactPhone, @PasswordHash, @UserType);
             SELECT CAST(SCOPE_IDENTITY() as int);";
 
+        public const string GetUserByEmail = @"
+            SELECT 
+                u.UserID,
+                u.UserType,
+                u.ContactEmail,
+                u.PasswordHash
+            FROM dbo.[User] u WHERE u.ContactEmail = @ContactEmail";
+
         public const string UpdateUserName = @"
             UPDATE dbo.[User]
             SET 
@@ -56,6 +64,66 @@ public static class SqlQueries
             WHERE UserID = @UserID";
 
         public const string DeleteUser = "DELETE FROM dbo.[User] WHERE UserID = @UserID";
+    }
+
+    /// <summary>
+    /// Session table related queries
+    /// </summary>
+    public static class Session
+    {
+        // Query for getting session info
+        public const string GetSessionInfoBase = @"
+            SELECT 
+                s.SessionID,
+                u.UserID,
+                s.AccessToken,
+                s.RefreshToken,
+                s.ATExpiresAt,
+                s.RTExpiresAt,
+                s.CreatedAt,
+                s.LastUpdatedAt
+            FROM dbo.[Session] s
+            INNER JOIN dbo.[User] u ON u.UserID = s.UserID";
+
+        public const string GetTokenResponseBaseDto = @"
+            SELECT 
+                s.AccessToken,
+                s.RefreshToken,
+                s.ATExpiresAt,
+                s.RTExpiresAt
+            FROM dbo.[Session] s";
+        
+        // Query for creating a new session
+        public const string InsertSession = @"
+            INSERT INTO dbo.[Session] (UserID, AccessToken, RefreshToken, ATExpiresAt, RTExpiresAt)
+            VALUES (@UserID, @AccessToken, @RefreshToken, @ATExpiresAt, @RTExpiresAt);
+            SELECT CAST(SCOPE_IDENTITY() as int);";
+
+        public const string UpdateAccessToken = @"
+            UPDATE dbo.[Session]
+            SET 
+                AccessToken = COALESCE(@AccessToken, AccessToken),
+                ATExpiresAt = COALESCE(@ATExpiresAt, ATExpiresAt),
+                LastUpdatedAt = sysdatetime()
+            WHERE SessionID = @SessionID";
+            
+        public const string UpdateRefreshToken = @"
+            UPDATE dbo.[Session]
+            SET 
+                RefreshToken = COALESCE(@RefreshToken, RefreshToken),
+                RTExpiresAt = COALESCE(@RTExpiresAt, RTExpiresAt),
+                LastUpdatedAt = sysdatetime()
+            WHERE SessionID = @SessionID";
+        
+        // Expire the AccessToken by setting it to NULL and setting the ATExpiresAt to the current time
+        // This can be used to logout a user by expiring the AccessToken
+        public const string ExpireAccessToken = @"
+            UPDATE dbo.[Session]
+            SET 
+                AccessToken = NULL,
+                ATExpiresAt = sysdatetime(),
+                LastUpdatedAt = sysdatetime()
+            WHERE SessionID = @SessionID";
     }
 
     /// <summary>

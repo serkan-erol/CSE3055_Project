@@ -45,7 +45,7 @@ public class CreateCustomerDto
 
     [Required]
     [StringLength(255)]
-    public string PasswordHash { get; set; } = string.Empty;
+    public string Password { get; set; } = string.Empty;
 
     [StringLength(50)]
     public string? CustomerType { get; set; }
@@ -65,7 +65,6 @@ public class CreateCustomerDto
 public class UpdateCustomerTypeDto
 {
     // Set by controller from route; not accepted from request body
-    // So we can prevent people from changing IDs in the DB
     [JsonIgnore]
     public int CustomerID { get; set; }
 
@@ -80,7 +79,6 @@ public class UpdateCustomerTypeDto
 public class UpdateCustomerReliabilityDto
 {
     // Set by controller from route; not accepted from request body
-    // So we can prevent people from changing IDs in the DB
     [JsonIgnore]
     public int CustomerID { get; set; }
 

@@ -23,12 +23,23 @@ public class UserResponseDto
 }
 
 /// <summary>
+/// DTO for returning User data to API clients for login
+/// Can be used for password verification
+/// </summary>
+public class GetUserByEmailResponseDto
+{
+    public int UserID { get; set; }
+    public string UserType { get; set; } = string.Empty;
+    public string ContactEmail { get; set; } = string.Empty;
+    public string PasswordHash { get; set; } = string.Empty;
+}
+
+/// <summary>
 /// DTO for updating UserName
 /// </summary>
 public class UpdateUserNameDto
 {
     // Set by controller from route; not accepted from request body
-    // So we can prevent people from changing IDs in the DB
     [JsonIgnore]
     public int UserID { get; set; }
 
@@ -42,7 +53,6 @@ public class UpdateUserNameDto
 public class UpdateUserEmailDto
 {
     // Set by controller from route; not accepted from request body
-    // So we can prevent people from changing IDs in the DB
     [JsonIgnore]
     public int UserID { get; set; }
 
@@ -57,7 +67,6 @@ public class UpdateUserEmailDto
 public class UpdateUserPhoneDto
 {
     // Set by controller from route; not accepted from request body
-    // So we can prevent people from changing IDs in the DB
     [JsonIgnore]
     public int UserID { get; set; }
 
@@ -67,14 +76,23 @@ public class UpdateUserPhoneDto
 
 /// <summary>
 /// DTO for updating User's Password
-/// </summary>'
+/// Can be used for password verification
+/// </summary>
 public class UpdateUserPasswordDto
 {
     // Set by controller from route; not accepted from request body
-    // So we can prevent people from changing IDs in the DB
     [JsonIgnore]
     public int UserID { get; set; }
 
+    [Required]
     [StringLength(100)]
-    public string PasswordHash { get; set; } = string.Empty;
+    public string ContactEmail { get; set; } = string.Empty;
+
+    [Required]
+    [StringLength(255)]
+    public string OldPassword { get; set; } = string.Empty;
+
+    [Required]
+    [StringLength(255)]
+    public string NewPassword { get; set; } = string.Empty;
 }
