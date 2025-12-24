@@ -13,6 +13,7 @@ public interface IFinancialTransactionRepository
     Task<FTResponseToCustomerDto> GetFTByIdForCustomerAsync(int customerId, int fTransactionId, CancellationToken cancellationToken = default);
     Task<FTResponseToEmployeeDto> GetFTByIdForEmployeeAsync(int fTransactionId, CancellationToken cancellationToken = default);
     Task<PaymentStatus> GetFTPaymentStatusAsync(int fTransactionId, CancellationToken cancellationToken = default);
+    Task<string> GetFTPaymentStatusDisplayNameAsync(int fTransactionId, CancellationToken cancellationToken = default);
     Task<FTResponseToCustomerDto> CreateFTAsync(CreateFTDto dto, CancellationToken cancellationToken = default);
     Task<FTResponseToCustomerDto> UpdateFTTotalPaidAsync(int customerId, int fTransactionId, UpdateFTTotalPaidDto dto, CancellationToken cancellationToken = default);
     Task<FTResponseToCustomerDto> UpdateFTDescriptionAsync(int customerId, UpdateFTDescriptionDto dto, CancellationToken cancellationToken = default);

@@ -105,6 +105,15 @@ public class FinancialTransactionRepository : IFinancialTransactionRepository
         // Return the payment status
         return paymentStatus;
     }
+
+    /// <summary>
+    /// Get Display Name of FT Payment Status
+    /// </summary>
+    public async Task<string> GetFTPaymentStatusDisplayNameAsync(int fTransactionId, CancellationToken cancellationToken = default)
+    {
+        var ftPaymentStatus = await GetFTPaymentStatusAsync(fTransactionId, cancellationToken);
+        return ftPaymentStatus.GetDisplayName();
+    }
     
     /// <summary>
     /// Create a new FT for customer and order
