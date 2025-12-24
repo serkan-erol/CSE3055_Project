@@ -481,393 +481,390 @@ public static class SqlQueries
             VALUES (@BillingID, @FTransactionID, @PaymentAmount, @PaymentType, @PaymentMethod, @ReferenceNumber);
             SELECT CAST(SCOPE_IDENTITY() as int);";
     }
+  
+    public static class Shipment
+    {
+        // Query for ShipOrder stored procedure
+        public const string ShipOrder = "dbo.ShipOrder";
+
+        // Base query for shipments to be seen by customers
+        public const string GetShipmentBaseForCustomer = @"
+            SELECT 
+                s.ShipmentID,
+                s.ShipmentStatus,
+                s.ShipmentDate,
+                s.OriginCountry,
+                s.DestinationCountry,
+                s.ExpectedDeliveryDate,
+                s.ActualDeliveryDate,
+                s.CreatedAt
+            FROM dbo.[Shipment] s";
+
+        // Base query for shipments to be seen by employees
+        public const string GetShipmentBaseForEmployee = @"
+            SELECT 
+                s.ShipmentID,
+                s.OrderID,
+                s.CustomsDocRef,
+                s.ShipmentStatus,
+                s.IsLocked,
+                s.LockedAt,
+                s.ShipmentDate,
+                s.OriginCountry,
+                s.DestinationCountry,
+                s.ExpectedDeliveryDate,
+                s.ActualDeliveryDate,
+                s.CreatedAt,
+                s.LastUpdatedAt
+            FROM dbo.[Shipment] s";
+
+        // Check if shipments already exist for an order
+        public const string GetExistingShipmentsByOrderId = @"
+            SELECT 
+                s.ShipmentID,
+                s.ExpectedDeliveryDate,
+                COUNT(b.BatchID) as BatchCount
+            FROM dbo.[Shipment] s
+            LEFT JOIN dbo.[Batch] b ON b.ShipmentID = s.ShipmentID
+            WHERE s.OrderID = @OrderID
+            GROUP BY s.ShipmentID, s.ExpectedDeliveryDate
+            ORDER BY s.ShipmentID";
+
+        // Get all batch IDs for an order
+        public const string GetBatchIdsByOrderId = @"
+            SELECT BatchID
+            FROM dbo.[Batch]
+            WHERE OrderID = @OrderID
+            ORDER BY BatchID";
+
+        // Insert new shipment
+        public const string InsertShipment = @"
+            INSERT INTO dbo.[Shipment] (OrderID, ShipmentDate, ExpectedDeliveryDate)
+            VALUES (@OrderID, @ShipmentDate, @ExpectedDeliveryDate);
+            SELECT CAST(SCOPE_IDENTITY() as int);";
+
+        // Update batch to link it to a shipment
+        public const string UpdateBatchShipmentId = @"
+            UPDATE dbo.[Batch]
+            SET ShipmentID = @ShipmentID
+            WHERE BatchID = @BatchID";
+
+        // Update order status to Shipped (2)
+        public const string UpdateOrderStatusToShipped = @"
+            UPDATE dbo.[Order]
+            SET OrderStatus = 2
+            WHERE OrderID = @OrderID
+            EXEC dbo.Update_LastUpdatedAt @Table = 'Order', @ID = @OrderID, @IDColumn = 'OrderID';";
+
+        // Update expected delivery date
+        public const string UpdateExpectedDeliveryDate = @"
+            UPDATE dbo.[Shipment]
+            SET 
+                ExpectedDeliveryDate = @ExpectedDeliveryDate,
+                LastUpdatedAt = sysdatetime()
+            WHERE ShipmentID = @ShipmentID";
+
+        // Update shipment status
+        public const string UpdateShipmentStatus = @"
+            UPDATE dbo.[Shipment]
+            SET 
+                ShipmentStatus = @ShipmentStatus,
+                LastUpdatedAt = sysdatetime()
+            WHERE ShipmentID = @ShipmentID";
+
+        // Set actual delivery date
+        public const string SetActualDeliveryDate = @"
+            UPDATE dbo.[Shipment]
+            SET 
+                ActualDeliveryDate = @ActualDeliveryDate,
+                LastUpdatedAt = sysdatetime()
+            WHERE ShipmentID = @ShipmentID";
+
+        // Update customs document reference
+        public const string UpdateCustomsDocRef = @"
+            UPDATE dbo.[Shipment]
+            SET 
+                CustomsDocRef = @CustomsDocRef,
+                LastUpdatedAt = sysdatetime()
+            WHERE ShipmentID = @ShipmentID";
+
+        // Lock shipment
+        public const string LockShipment = @"
+            UPDATE dbo.[Shipment]
+            SET 
+                IsLocked = 1,
+                LockedAt = sysdatetime()
+            WHERE ShipmentID = @ShipmentID";
+
+        // Unlock shipment
+        public const string UnlockShipment = @"
+            UPDATE dbo.[Shipment]
+            SET 
+                IsLocked = 0,
+                LockedAt = NULL
+            WHERE ShipmentID = @ShipmentID";
+
+        // Check if shipment is locked
+        public const string CheckIfShipmentIsLocked = @"
+            SELECT IsLocked
+            FROM dbo.[Shipment]
+            WHERE ShipmentID = @ShipmentID";
+
+        // Get shipment status by ID
+        public const string GetShipmentStatusById = @"
+            SELECT ShipmentStatus
+            FROM dbo.[Shipment]
+            WHERE ShipmentID = @ShipmentID";
+    }
+
+
+    public static class Treasury
+    {
+        // Get all treasury entries
+        public const string GetAllTreasuryEntries = @"
+            SELECT 
+                TreasuryID,
+                FTransactionID,
+                Amount,
+                Description,
+                EntryDate,
+                LastUpdatedAt
+            FROM dbo.[Treasury]
+            ORDER BY TreasuryID DESC";
+
+        // Get treasury entry by ID
+        public const string GetTreasuryEntryById = @"
+            SELECT 
+                TreasuryID,
+                FTransactionID,
+                Amount,
+                Description,
+                EntryDate,
+                LastUpdatedAt
+            FROM dbo.[Treasury]
+            WHERE TreasuryID = @TreasuryID";
+
+        // Get current balance
+        public const string GetCurrentBalance = @"
+            SELECT 
+                ISNULL(SUM(Amount), 0) as CurrentBalance,
+                MAX(EntryDate) as LastUpdated,
+                COUNT(*) as TotalEntries
+            FROM dbo.[Treasury]";
+
+        // Get treasury entries by transaction ID
+        public const string GetTreasuryEntriesByTransactionId = @"
+            SELECT 
+                TreasuryID,
+                FTransactionID,
+                Amount,
+                Description,
+                EntryDate,
+                LastUpdatedAt
+            FROM dbo.[Treasury]
+            WHERE FTransactionID = @FTransactionID
+            ORDER BY TreasuryID";
+
+        // Stored procedures
+        // public const string CreateTreasuryEntry = "dbo.CreateTreasuryEntry"; // Now handled by trigger
+    }
+
+    public static class CustomerPayment
+    {
+        // Saved Payment Methods
+        public const string GetSavedPaymentMethodsByCustomerId = @"
+            SELECT 
+                SPMID,
+                CustomerID,
+                CardNumber,
+                CardType,
+                CardExpirationDate,
+                RecordExpirationDate,
+                CreatedAt,
+                LastUpdatedAt
+            FROM dbo.[SavedPaymentMethod]
+            WHERE CustomerID = @CustomerID
+            ORDER BY CreatedAt DESC";
+
+        public const string GetSavedPaymentMethodById = @"
+            SELECT 
+                SPMID,
+                CustomerID,
+                CardNumber,
+                CardType,
+                CardExpirationDate,
+                RecordExpirationDate,
+                CreatedAt,
+                LastUpdatedAt
+            FROM dbo.[SavedPaymentMethod]
+            WHERE SPMID = @SPMID";
+
+        public const string CreateSavedPaymentMethod = @"
+            INSERT INTO dbo.[SavedPaymentMethod] 
+            (CustomerID, CardNumber, CardType, CardExpirationDate, RecordExpirationDate)
+            OUTPUT INSERTED.*
+            VALUES (@CustomerID, @CardNumber, @CardType, @CardExpirationDate, @RecordExpirationDate)";
+
+        public const string UpdateSavedPaymentMethod = @"
+            UPDATE dbo.[SavedPaymentMethod]
+            SET CardNumber = @CardNumber,
+                CardType = @CardType,
+                CardExpirationDate = @CardExpirationDate,
+                RecordExpirationDate = @RecordExpirationDate,
+                LastUpdatedAt = GETUTCDATE()
+            OUTPUT INSERTED.*
+            WHERE SPMID = @SPMID";
+
+        public const string DeleteSavedPaymentMethod = @"
+            DELETE FROM dbo.[SavedPaymentMethod]
+            WHERE SPMID = @SPMID";
+
+        // Saved Bank Information
+        public const string GetSavedBankInformationByCustomerId = @"
+            SELECT 
+                SBIID,
+                CustomerID,
+                BankName,
+                AccountNo,
+                IBAN,
+                CreatedAt,
+                LastUpdatedAt
+            FROM dbo.[SavedBankInformation]
+            WHERE CustomerID = @CustomerID
+            ORDER BY CreatedAt DESC";
+
+        public const string GetSavedBankInformationById = @"
+            SELECT 
+                SBIID,
+                CustomerID,
+                BankName,
+                AccountNo,
+                IBAN,
+                CreatedAt,
+                LastUpdatedAt
+            FROM dbo.[SavedBankInformation]
+            WHERE SBIID = @SBIID";
+
+        public const string CreateSavedBankInformation = @"
+            INSERT INTO dbo.[SavedBankInformation] 
+            (CustomerID, BankName, AccountNo, IBAN)
+            OUTPUT INSERTED.*
+            VALUES (@CustomerID, @BankName, @AccountNo, @IBAN)";
+
+        public const string UpdateSavedBankInformation = @"
+            UPDATE dbo.[SavedBankInformation]
+            SET BankName = @BankName,
+                AccountNo = @AccountNo,
+                IBAN = @IBAN,
+                LastUpdatedAt = GETUTCDATE()
+            OUTPUT INSERTED.*
+            WHERE SBIID = @SBIID";
+
+        public const string DeleteSavedBankInformation = @"
+            DELETE FROM dbo.[SavedBankInformation]
+            WHERE SBIID = @SBIID";
+    }
+
+
+    public static class Fabric
+    {
+        public const string GetAllFabrics = @"
+            SELECT 
+                FabricID,
+                FabricType,
+                Composition,
+                Color,
+                WeightPerUnit,
+                StockQuantity,
+                Description
+            FROM dbo.[Fabric]
+            ORDER BY FabricID";
+
+        public const string GetFabricById = @"
+            SELECT 
+                FabricID,
+                FabricType,
+                Composition,
+                Color,
+                WeightPerUnit,
+                StockQuantity,
+                Description
+            FROM dbo.[Fabric]
+            WHERE FabricID = @FabricID";
+
+        public const string InsertFabric = @"
+            INSERT INTO dbo.[Fabric] (FabricType, Composition, Color, WeightPerUnit, StockQuantity, Description)
+            VALUES (@FabricType, @Composition, @Color, @WeightPerUnit, @StockQuantity, @Description);
+            SELECT CAST(SCOPE_IDENTITY() as int);";
+
+        public const string UpdateFabricStock = @"
+            UPDATE dbo.[Fabric]
+            SET StockQuantity = StockQuantity + @QuantityChange
+            WHERE FabricID = @FabricID";
+    }
+
+    public static class Batch
+    {
+        public const string GetBatchesForCustomer = @"
+            SELECT 
+                BatchNumber,
+                Quantity,
+                BatchPrice,
+                ProductionDate,
+                QualityGrade
+            FROM dbo.[Batch]
+            WHERE OrderID = @OrderID
+            ORDER BY BatchID";
+
+        public const string GetBatchesForEmployee = @"
+            SELECT 
+                BatchID,
+                OrderID,
+                ShipmentID,
+                FabricID,
+                BatchNumber,
+                Quantity,
+                BatchPrice,
+                ProductionDate,
+                QualityGrade,
+                CreatedAt
+            FROM dbo.[Batch]
+            WHERE OrderID = @OrderID
+            ORDER BY BatchID";
+
+        public const string GetBatchById = @"
+            SELECT 
+                BatchID,
+                OrderID,
+                ShipmentID,
+                FabricID,
+                BatchNumber,
+                Quantity,
+                BatchPrice,
+                ProductionDate,
+                QualityGrade,
+                CreatedAt
+            FROM dbo.[Batch]
+            WHERE BatchID = @BatchID";
+
+        public const string GetUnshippedBatches = @"
+            SELECT 
+                BatchID,
+                OrderID,
+                ShipmentID,
+                FabricID,
+                BatchNumber,
+                Quantity,
+                BatchPrice,
+                ProductionDate,
+                QualityGrade,
+                CreatedAt
+            FROM dbo.[Batch]
+            WHERE OrderID = @OrderID
+            AND ShipmentID IS NULL
+            ORDER BY BatchID";
+
+        // Stored procedure to create batches 
+        public const string CreateBatches = "dbo.CreateBatches";
+    }
 }
-
-    
-public static class Shipment
-{
-     // Query for ShipOrder stored procedure
-      public const string ShipOrder = "dbo.ShipOrder";
-
-    // Base query for shipments to be seen by customers
-    public const string GetShipmentBaseForCustomer = @"
-        SELECT 
-            s.ShipmentID,
-            s.ShipmentStatus,
-            s.ShipmentDate,
-            s.OriginCountry,
-            s.DestinationCountry,
-            s.ExpectedDeliveryDate,
-            s.ActualDeliveryDate,
-            s.CreatedAt
-        FROM dbo.[Shipment] s";
-
-    // Base query for shipments to be seen by employees
-    public const string GetShipmentBaseForEmployee = @"
-        SELECT 
-            s.ShipmentID,
-            s.OrderID,
-            s.CustomsDocRef,
-            s.ShipmentStatus,
-            s.IsLocked,
-            s.LockedAt,
-            s.ShipmentDate,
-            s.OriginCountry,
-            s.DestinationCountry,
-            s.ExpectedDeliveryDate,
-            s.ActualDeliveryDate,
-            s.CreatedAt,
-            s.LastUpdatedAt
-        FROM dbo.[Shipment] s";
-
-    // Check if shipments already exist for an order
-    public const string GetExistingShipmentsByOrderId = @"
-        SELECT 
-            s.ShipmentID,
-            s.ExpectedDeliveryDate,
-            COUNT(b.BatchID) as BatchCount
-        FROM dbo.[Shipment] s
-        LEFT JOIN dbo.[Batch] b ON b.ShipmentID = s.ShipmentID
-        WHERE s.OrderID = @OrderID
-        GROUP BY s.ShipmentID, s.ExpectedDeliveryDate
-        ORDER BY s.ShipmentID";
-
-    // Get all batch IDs for an order
-    public const string GetBatchIdsByOrderId = @"
-        SELECT BatchID
-        FROM dbo.[Batch]
-        WHERE OrderID = @OrderID
-        ORDER BY BatchID";
-
-    // Insert new shipment
-    public const string InsertShipment = @"
-        INSERT INTO dbo.[Shipment] (OrderID, ShipmentDate, ExpectedDeliveryDate)
-        VALUES (@OrderID, @ShipmentDate, @ExpectedDeliveryDate);
-        SELECT CAST(SCOPE_IDENTITY() as int);";
-
-    // Update batch to link it to a shipment
-    public const string UpdateBatchShipmentId = @"
-        UPDATE dbo.[Batch]
-        SET ShipmentID = @ShipmentID
-        WHERE BatchID = @BatchID";
-
-    // Update order status to Shipped (2)
-    public const string UpdateOrderStatusToShipped = @"
-        UPDATE dbo.[Order]
-        SET OrderStatus = 2
-        WHERE OrderID = @OrderID
-        EXEC dbo.Update_LastUpdatedAt @Table = 'Order', @ID = @OrderID, @IDColumn = 'OrderID';";
-
-    // Update expected delivery date
-    public const string UpdateExpectedDeliveryDate = @"
-        UPDATE dbo.[Shipment]
-        SET 
-            ExpectedDeliveryDate = @ExpectedDeliveryDate,
-            LastUpdatedAt = sysdatetime()
-        WHERE ShipmentID = @ShipmentID";
-
-    // Update shipment status
-    public const string UpdateShipmentStatus = @"
-        UPDATE dbo.[Shipment]
-        SET 
-            ShipmentStatus = @ShipmentStatus,
-            LastUpdatedAt = sysdatetime()
-        WHERE ShipmentID = @ShipmentID";
-
-    // Set actual delivery date
-    public const string SetActualDeliveryDate = @"
-        UPDATE dbo.[Shipment]
-        SET 
-            ActualDeliveryDate = @ActualDeliveryDate,
-            LastUpdatedAt = sysdatetime()
-        WHERE ShipmentID = @ShipmentID";
-
-    // Update customs document reference
-    public const string UpdateCustomsDocRef = @"
-        UPDATE dbo.[Shipment]
-        SET 
-            CustomsDocRef = @CustomsDocRef,
-            LastUpdatedAt = sysdatetime()
-        WHERE ShipmentID = @ShipmentID";
-
-    // Lock shipment
-    public const string LockShipment = @"
-        UPDATE dbo.[Shipment]
-        SET 
-            IsLocked = 1,
-            LockedAt = sysdatetime()
-        WHERE ShipmentID = @ShipmentID";
-
-    // Unlock shipment
-    public const string UnlockShipment = @"
-        UPDATE dbo.[Shipment]
-        SET 
-            IsLocked = 0,
-            LockedAt = NULL
-        WHERE ShipmentID = @ShipmentID";
-
-    // Check if shipment is locked
-    public const string CheckIfShipmentIsLocked = @"
-        SELECT IsLocked
-        FROM dbo.[Shipment]
-        WHERE ShipmentID = @ShipmentID";
-
-    // Get shipment status by ID
-    public const string GetShipmentStatusById = @"
-        SELECT ShipmentStatus
-        FROM dbo.[Shipment]
-        WHERE ShipmentID = @ShipmentID";
-}
-
-
-public static class Treasury
-{
-    // Get all treasury entries
-    public const string GetAllTreasuryEntries = @"
-        SELECT 
-            TreasuryID,
-            FTransactionID,
-            Amount,
-            Description,
-            EntryDate,
-            LastUpdatedAt
-        FROM dbo.[Treasury]
-        ORDER BY TreasuryID DESC";
-
-    // Get treasury entry by ID
-    public const string GetTreasuryEntryById = @"
-        SELECT 
-            TreasuryID,
-            FTransactionID,
-            Amount,
-            Description,
-            EntryDate,
-            LastUpdatedAt
-        FROM dbo.[Treasury]
-        WHERE TreasuryID = @TreasuryID";
-
-    // Get current balance
-    public const string GetCurrentBalance = @"
-        SELECT 
-            ISNULL(SUM(Amount), 0) as CurrentBalance,
-            MAX(EntryDate) as LastUpdated,
-            COUNT(*) as TotalEntries
-        FROM dbo.[Treasury]";
-
-    // Get treasury entries by transaction ID
-    public const string GetTreasuryEntriesByTransactionId = @"
-        SELECT 
-            TreasuryID,
-            FTransactionID,
-            Amount,
-            Description,
-            EntryDate,
-            LastUpdatedAt
-        FROM dbo.[Treasury]
-        WHERE FTransactionID = @FTransactionID
-        ORDER BY TreasuryID";
-
-    // Stored procedures
-    // public const string CreateTreasuryEntry = "dbo.CreateTreasuryEntry"; // Now handled by trigger
-}
-
-public static class CustomerPayment
-{
-    // Saved Payment Methods
-    public const string GetSavedPaymentMethodsByCustomerId = @"
-        SELECT 
-            SPMID,
-            CustomerID,
-            CardNumber,
-            CardType,
-            CardExpirationDate,
-            RecordExpirationDate,
-            CreatedAt,
-            LastUpdatedAt
-        FROM dbo.[SavedPaymentMethod]
-        WHERE CustomerID = @CustomerID
-        ORDER BY CreatedAt DESC";
-
-    public const string GetSavedPaymentMethodById = @"
-        SELECT 
-            SPMID,
-            CustomerID,
-            CardNumber,
-            CardType,
-            CardExpirationDate,
-            RecordExpirationDate,
-            CreatedAt,
-            LastUpdatedAt
-        FROM dbo.[SavedPaymentMethod]
-        WHERE SPMID = @SPMID";
-
-    public const string CreateSavedPaymentMethod = @"
-        INSERT INTO dbo.[SavedPaymentMethod] 
-        (CustomerID, CardNumber, CardType, CardExpirationDate, RecordExpirationDate)
-        OUTPUT INSERTED.*
-        VALUES (@CustomerID, @CardNumber, @CardType, @CardExpirationDate, @RecordExpirationDate)";
-
-    public const string UpdateSavedPaymentMethod = @"
-        UPDATE dbo.[SavedPaymentMethod]
-        SET CardNumber = @CardNumber,
-            CardType = @CardType,
-            CardExpirationDate = @CardExpirationDate,
-            RecordExpirationDate = @RecordExpirationDate,
-            LastUpdatedAt = GETUTCDATE()
-        OUTPUT INSERTED.*
-        WHERE SPMID = @SPMID";
-
-    public const string DeleteSavedPaymentMethod = @"
-        DELETE FROM dbo.[SavedPaymentMethod]
-        WHERE SPMID = @SPMID";
-
-    // Saved Bank Information
-    public const string GetSavedBankInformationByCustomerId = @"
-        SELECT 
-            SBIID,
-            CustomerID,
-            BankName,
-            AccountNo,
-            IBAN,
-            CreatedAt,
-            LastUpdatedAt
-        FROM dbo.[SavedBankInformation]
-        WHERE CustomerID = @CustomerID
-        ORDER BY CreatedAt DESC";
-
-    public const string GetSavedBankInformationById = @"
-        SELECT 
-            SBIID,
-            CustomerID,
-            BankName,
-            AccountNo,
-            IBAN,
-            CreatedAt,
-            LastUpdatedAt
-        FROM dbo.[SavedBankInformation]
-        WHERE SBIID = @SBIID";
-
-    public const string CreateSavedBankInformation = @"
-        INSERT INTO dbo.[SavedBankInformation] 
-        (CustomerID, BankName, AccountNo, IBAN)
-        OUTPUT INSERTED.*
-        VALUES (@CustomerID, @BankName, @AccountNo, @IBAN)";
-
-    public const string UpdateSavedBankInformation = @"
-        UPDATE dbo.[SavedBankInformation]
-        SET BankName = @BankName,
-            AccountNo = @AccountNo,
-            IBAN = @IBAN,
-            LastUpdatedAt = GETUTCDATE()
-        OUTPUT INSERTED.*
-        WHERE SBIID = @SBIID";
-
-    public const string DeleteSavedBankInformation = @"
-        DELETE FROM dbo.[SavedBankInformation]
-        WHERE SBIID = @SBIID";
-}
-
-
-public static class Fabric
-{
-    public const string GetAllFabrics = @"
-        SELECT 
-            FabricID,
-            FabricType,
-            Composition,
-            Color,
-            WeightPerUnit,
-            StockQuantity,
-            Description
-        FROM dbo.[Fabric]
-        ORDER BY FabricID";
-
-    public const string GetFabricById = @"
-        SELECT 
-            FabricID,
-            FabricType,
-            Composition,
-            Color,
-            WeightPerUnit,
-            StockQuantity,
-            Description
-        FROM dbo.[Fabric]
-        WHERE FabricID = @FabricID";
-
-    public const string InsertFabric = @"
-        INSERT INTO dbo.[Fabric] (FabricType, Composition, Color, WeightPerUnit, StockQuantity, Description)
-        VALUES (@FabricType, @Composition, @Color, @WeightPerUnit, @StockQuantity, @Description);
-        SELECT CAST(SCOPE_IDENTITY() as int);";
-
-    public const string UpdateFabricStock = @"
-        UPDATE dbo.[Fabric]
-        SET StockQuantity = StockQuantity + @QuantityChange
-        WHERE FabricID = @FabricID";
-}
-
-public static class Batch
-{
-    public const string GetBatchesForCustomer = @"
-        SELECT 
-            BatchNumber,
-            Quantity,
-            BatchPrice,
-            ProductionDate,
-            QualityGrade
-        FROM dbo.[Batch]
-        WHERE OrderID = @OrderID
-        ORDER BY BatchID";
-
-    public const string GetBatchesForEmployee = @"
-        SELECT 
-            BatchID,
-            OrderID,
-            ShipmentID,
-            FabricID,
-            BatchNumber,
-            Quantity,
-            BatchPrice,
-            ProductionDate,
-            QualityGrade,
-            CreatedAt
-        FROM dbo.[Batch]
-        WHERE OrderID = @OrderID
-        ORDER BY BatchID";
-
-    public const string GetBatchById = @"
-        SELECT 
-            BatchID,
-            OrderID,
-            ShipmentID,
-            FabricID,
-            BatchNumber,
-            Quantity,
-            BatchPrice,
-            ProductionDate,
-            QualityGrade,
-            CreatedAt
-        FROM dbo.[Batch]
-        WHERE BatchID = @BatchID";
-
-    public const string GetUnshippedBatches = @"
-        SELECT 
-            BatchID,
-            OrderID,
-            ShipmentID,
-            FabricID,
-            BatchNumber,
-            Quantity,
-            BatchPrice,
-            ProductionDate,
-            QualityGrade,
-            CreatedAt
-        FROM dbo.[Batch]
-        WHERE OrderID = @OrderID
-        AND ShipmentID IS NULL
-        ORDER BY BatchID";
-
-    // Stored procedure to create batches 
-    public const string CreateBatches = "dbo.CreateBatches";
-}
-}
-

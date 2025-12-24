@@ -549,7 +549,7 @@ BEGIN
         
         THROW;
     END CATCH
-END
+END;
 GO
 
 --------------------------------------------------------------------------------------------------------------------------------
@@ -627,7 +627,7 @@ BEGIN
         SET @Remaining -= @BatchQty;
         SET @Counter += 1;
     END
-END
+END;
 GO
 
 --------------------------------------------------------------------------------------------------------------------------------
@@ -704,7 +704,7 @@ BEGIN
             ROLLBACK TRANSACTION;
         THROW;
     END CATCH
-END
+END;
 GO
 
 --------------------------------------------------------------------------------------------------------------------------------
@@ -1128,11 +1128,12 @@ BEGIN
     CLOSE payment_cursor;
     DEALLOCATE payment_cursor;
 END;
+GO
 
 ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 -- Trigger to create treasury entries for each financial transaction
-CREATE TRIGGER trg_FinancialTransaction_CreateTreasuryEntry
+CREATE TRIGGER dbo.trg_FinancialTransaction_CreateTreasuryEntry
 ON dbo.[FinancialTransaction]
 AFTER INSERT
 AS
@@ -1149,7 +1150,7 @@ BEGIN
         END as Amount,
         'Auto-generated from ' + TransactionType + ' transaction'
     FROM inserted;
-END
+END;
 GO
 
 ---------------------------------------------------------------------------------------------------------------------------------
@@ -1186,5 +1187,5 @@ BEGIN
     FROM dbo.[Order] o
     JOIN @AffectedOrders ao
         ON o.OrderID = ao.OrderID;
-END
+END;
 GO
