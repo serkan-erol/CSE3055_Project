@@ -17,21 +17,6 @@ public class TreasuryResponseDto
 }
 
 /// <summary>
-/// DTO for manually adding money to treasury (employees only)
-/// </summary>
-public class AddMoneyToTreasuryDto
-{
-    [Required]
-    public decimal Amount { get; set; }
-
-    [Required]
-    [JsonIgnore]
-    public int EmployeeID { get; set; }
-
-    public string? Description { get; set; }
-}
-
-/// <summary>
 /// DTO for getting current treasury balance
 /// </summary>
 public class TreasuryBalanceDto
