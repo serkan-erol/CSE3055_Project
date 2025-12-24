@@ -27,6 +27,14 @@ public static class SqlQueries
             VALUES (@UserName, @ContactEmail, @ContactPhone, @PasswordHash, @UserType);
             SELECT CAST(SCOPE_IDENTITY() as int);";
 
+        public const string GetUserByEmail = @"
+            SELECT 
+                u.UserID,
+                u.UserType,
+                u.ContactEmail,
+                u.PasswordHash
+            FROM dbo.[User] u WHERE u.ContactEmail = @ContactEmail";
+
         public const string UpdateUserName = @"
             UPDATE dbo.[User]
             SET 
@@ -56,6 +64,73 @@ public static class SqlQueries
             WHERE UserID = @UserID";
 
         public const string DeleteUser = "DELETE FROM dbo.[User] WHERE UserID = @UserID";
+    }
+
+    /// <summary>
+    /// Session table related queries
+    /// </summary>
+    public static class Session
+    {
+        // Query for getting session info
+        public const string GetSessionInfoBase = @"
+            SELECT 
+                s.SessionID,
+                u.UserID,
+                s.AccessToken,
+                s.RefreshToken,
+                s.ATExpiresAt,
+                s.RTExpiresAt,
+                s.CreatedAt,
+                s.LastUpdatedAt
+            FROM dbo.[Session] s
+            INNER JOIN dbo.[User] u ON u.UserID = s.UserID";
+        
+        // Query for getting token info
+        public const string GetTokenResponseBaseDto = @"
+            SELECT 
+                s.AccessToken,
+                s.RefreshToken,
+                s.ATExpiresAt,
+                s.RTExpiresAt
+            FROM dbo.[Session] s";
+        
+        // Query for creating a new session
+        public const string InsertSession = @"
+            INSERT INTO dbo.[Session] (UserID, AccessToken, RefreshToken, ATExpiresAt, RTExpiresAt)
+            VALUES (@UserID, @AccessToken, @RefreshToken, @ATExpiresAt, @RTExpiresAt);
+            SELECT CAST(SCOPE_IDENTITY() as int);";
+
+        public const string UpdateAccessToken = @"
+            UPDATE dbo.[Session]
+            SET 
+                AccessToken = COALESCE(@AccessToken, AccessToken),
+                ATExpiresAt = COALESCE(@ATExpiresAt, ATExpiresAt),
+                LastUpdatedAt = sysdatetime()
+            WHERE SessionID = @SessionID";
+            
+        public const string UpdateRefreshToken = @"
+            UPDATE dbo.[Session]
+            SET 
+                RefreshToken = COALESCE(@RefreshToken, RefreshToken),
+                RTExpiresAt = COALESCE(@RTExpiresAt, RTExpiresAt),
+                LastUpdatedAt = sysdatetime()
+            WHERE SessionID = @SessionID";
+        
+        // Expire the AccessToken by setting the ATExpiresAt to the current time
+        // This can be used to logout a user by expiring the AccessToken
+        public const string ExpireAccessToken = @"
+            UPDATE dbo.[Session]
+            SET 
+                ATExpiresAt = sysdatetime(),
+                LastUpdatedAt = sysdatetime()
+            WHERE SessionID = @SessionID";
+
+        // Check if a session is valid
+        public const string IsSessionValidBase = @"
+            SELECT 
+                CASE WHEN s.ATExpiresAt > sysdatetime() AND s.RTExpiresAt > sysdatetime() THEN 1 ELSE 0 END
+            FROM dbo.[Session] s
+            INNER JOIN dbo.[User] u ON u.UserID = s.UserID";
     }
 
     /// <summary>
@@ -134,6 +209,18 @@ public static class SqlQueries
                 u.LastUpdatedAt
             FROM dbo.[Employee] e
             INNER JOIN dbo.[User] u ON u.UserID = e.EmployeeID AND u.UserType = e.UserType";
+
+        public const string GetEmployeeRole = @"
+            SELECT 
+                e.EmployeeRole
+            FROM dbo.[Employee] e
+            WHERE e.EmployeeID = @EmployeeID";
+
+        public const string GetEmployeeAccessLevel = @"
+            SELECT 
+                e.AccessLevel
+            FROM dbo.[Employee] e
+            WHERE e.EmployeeID = @EmployeeID";
 
         public const string InsertEmployee = @"
             INSERT INTO dbo.[Employee] (EmployeeID, EmployeeRole, AccessLevel)

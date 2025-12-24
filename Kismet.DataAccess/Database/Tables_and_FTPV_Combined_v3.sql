@@ -21,6 +21,21 @@ CREATE TABLE dbo.[User] (
     LastUpdatedAt       datetime2 NULL
 );
 
+-- Session Table --
+CREATE TABLE dbo.[Session] (
+    SessionID             int IDENTITY PRIMARY KEY,
+    UserID                int NOT NULL,
+    AccessToken           nvarchar(500) NULL,
+    RefreshToken          nvarchar(500) NOT NULL,
+    ATExpiresAt           datetime2 NULL,
+    RTExpiresAt           datetime2 NOT NULL,
+    CreatedAt             datetime2 NOT NULL DEFAULT sysdatetime(),
+    LastUpdatedAt         datetime2 NULL,
+
+    CONSTRAINT FK_Session_User
+        FOREIGN KEY (UserID) REFERENCES dbo.[User](UserID)
+);
+
 -- Unique index to support the foreing key references for the Employee and the Customer tables
 CREATE UNIQUE INDEX UQ_User_UserID_UserType ON dbo.[User](UserID, UserType);
 

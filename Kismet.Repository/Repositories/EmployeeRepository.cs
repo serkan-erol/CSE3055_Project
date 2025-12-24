@@ -1,4 +1,5 @@
 using Dapper;
+using BCrypt.Net;
 using Kismet.Core.Data;
 using Kismet.Entities.DTOs;
 using Kismet.Entities.Models;
@@ -60,6 +61,10 @@ public class EmployeeRepository : IEmployeeRepository
 
             try
             {
+
+                // Hash password with BCrypt
+                var passwordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password);
+
                 // Insert User (super-type) - create anonymous object from DTO + required UserType value
                 userId = await connection.QuerySingleAsync<int>(
                     new CommandDefinition(SqlQueries.User.InsertUser, new
@@ -67,7 +72,7 @@ public class EmployeeRepository : IEmployeeRepository
                         dto.UserName,
                         dto.ContactEmail,
                         dto.ContactPhone,
-                        dto.PasswordHash,
+                        PasswordHash = passwordHash,
                         UserType = "Employee"
                     }, 
                         transaction, cancellationToken: cancellationToken));

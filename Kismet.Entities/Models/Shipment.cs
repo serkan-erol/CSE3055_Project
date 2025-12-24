@@ -14,12 +14,12 @@ namespace Kismet.Entities.Models
         [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
         public int ShipmentID { get; set; }
 
-        [Column("POrderID")]
-        [ForeignKey("PurchaseOrder")]
-        public int POrderID { get; set; }
+        [Column("OrderID")]
+        [ForeignKey("Order")]
+        public int OrderID { get; set; }
 
-        // Navigation property for the 1-to-M relationship with PurchaseOrder
-        public PurchaseOrder PurchaseOrder { get; set; } = null!;
+        // Navigation property for the 1-to-M relationship with Order
+        public Order Order { get; set; } = null!;
 
         [Column("CustomDocRef")]
         public string? CustomsDocRef { get; set; }

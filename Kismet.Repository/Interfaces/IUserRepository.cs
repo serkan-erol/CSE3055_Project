@@ -13,6 +13,7 @@ public interface IUserRepository
     Task<IReadOnlyList<UserResponseDto>> GetAllDtoAsync(CancellationToken cancellationToken = default);
     Task<UserResponseDto?> GetByIdDtoAsync(int userId, CancellationToken cancellationToken = default);
     // Exposed as end-points in the controller
+    Task<GetUserByEmailResponseDto?> GetByEmailAsync(string email, CancellationToken cancellationToken = default);
     Task<UserResponseDto?> UpdateUserNameAsync(UpdateUserNameDto dto, CancellationToken cancellationToken = default);
     Task<UserResponseDto?> UpdateUserEmailAsync(UpdateUserEmailDto dto, CancellationToken cancellationToken = default);
     Task<UserResponseDto?> UpdateUserPhoneAsync(UpdateUserPhoneDto dto, CancellationToken cancellationToken = default);
@@ -21,4 +22,3 @@ public interface IUserRepository
     // Delete 
     Task<bool> DeleteAsync(int userId, CancellationToken cancellationToken = default);
 }
-

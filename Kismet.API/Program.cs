@@ -1,3 +1,4 @@
+using Kismet.Core.Helpers;
 using Kismet.Infrastructure;
 using Kismet.Repository;
 
@@ -14,12 +15,17 @@ const string LocalCorsPolicy = "LocalCorsPolicy";
 var allowedOrigins = new[]
 {
     "http://localhost:3055",
-    "https://localhost:3055"
+    "https://localhost:3055",
+    "http://localhost:5173",  // Vite dev server
+    "https://localhost:5173"
 };
 
 builder.Services
     .AddInfrastructure(builder.Configuration)  // Registers SqlConnectionFactory
     .AddRepositories();                        // Registers repositories
+
+// Register JwtHelper to create JWT tokens
+builder.Services.AddScoped<JwtHelper>();
 
 builder.Services.AddCors(options =>
 {
@@ -27,7 +33,8 @@ builder.Services.AddCors(options =>
     {
         policy.WithOrigins(allowedOrigins)
               .AllowAnyHeader()
-              .AllowAnyMethod();
+              .AllowAnyMethod()
+              .AllowCredentials(); // Required for cookies
     });
 });
 
@@ -40,7 +47,10 @@ app.UseSwaggerUI();
 
 app.UseCors(LocalCorsPolicy);
 
-//app.UseAuthorization();
+// Middleware to read access token from cookie and add to Authorization header
+app.UseMiddleware<Kismet.API.Middleware.CookieTokenMiddleware>();
+
+app.UseAuthorization();
 
 app.MapControllers();
 

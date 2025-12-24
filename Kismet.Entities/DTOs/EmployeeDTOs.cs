@@ -43,7 +43,7 @@ public class CreateEmployeeDto
 
     [Required]
     [StringLength(255)]
-    public string PasswordHash { get; set; } = string.Empty;
+    public string Password { get; set; } = string.Empty;
 
     [Required]
     [StringLength(50)]
@@ -59,7 +59,6 @@ public class CreateEmployeeDto
 public class UpdateEmployeeRoleDto
 {
     // Set by controller from route; not accepted from request body
-    // So we can prevent people from changing IDs in the DB while updating a specific Employee with a specific ID
     [JsonIgnore]
     public int EmployeeID { get; set; }
 
@@ -74,7 +73,6 @@ public class UpdateEmployeeRoleDto
 public class UpdateEmployeeAccessLevelDto
 {
     // Set by controller from route; not accepted from request body
-    // So we can prevent people from changing IDs in the DB
     [JsonIgnore]
     public int EmployeeID { get; set; }
 

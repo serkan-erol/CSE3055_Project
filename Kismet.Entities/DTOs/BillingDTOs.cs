@@ -98,7 +98,6 @@ public class UpdateBillingTypeDto
 public class UpdateBillingDto
 {
     // Set by controller from route; not accepted from request body
-    // So we can prevent people from changing IDs in the DB
     [JsonIgnore]
     public int BillingID { get; set; }
 

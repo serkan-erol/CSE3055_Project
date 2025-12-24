@@ -1,3 +1,4 @@
+using Kismet.Core.Helpers;
 using Kismet.Entities.DTOs;
 using Kismet.Repository.Interfaces;
 using Microsoft.AspNetCore.Mvc;
@@ -9,10 +10,16 @@ namespace Kismet.API.Controllers;
 public class EmployeeController : ControllerBase
 {
     private readonly IEmployeeRepository _employeeRepository;
+    private readonly ISessionRepository _sessionRepository;
+    private readonly JwtHelper _jwtHelper;
 
-    public EmployeeController(IEmployeeRepository employeeRepository)
+    public EmployeeController(IEmployeeRepository employeeRepository, 
+                              ISessionRepository sessionRepository, 
+                              JwtHelper jwtHelper)
     {
         _employeeRepository = employeeRepository;
+        _sessionRepository = sessionRepository;
+        _jwtHelper = jwtHelper;
     }
 
     /// <summary>
@@ -74,6 +81,15 @@ public class EmployeeController : ControllerBase
             }
             
             var created = await _employeeRepository.CreateAsync(dto, cancellationToken);
+
+            // Create a new session for the employee and login
+            var newSession = await _sessionRepository.CreateAsync(new CreateSessionDto
+            {
+                UserID = created.EmployeeID,
+                Email = created.ContactEmail,
+                RefreshToken = string.Empty,
+                RTExpiresAt = DateTimeOffset.UtcNow
+            }, cancellationToken);
             
             // Return Created with Location header pointing to the new resource
             return Created($"/api/employees/{created.EmployeeID}", created);

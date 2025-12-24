@@ -16,10 +16,33 @@ public class UserController : ControllerBase
     }
 
     /// <summary>
+    /// Get user by ID (works for Customer or Employee)
+    /// </summary>
+    [HttpGet("{userId:int}")]
+    public async Task<IActionResult> GetByIdAsync(int userId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var user = await _userRepository.GetByIdDtoAsync(userId, cancellationToken);
+            
+            if (user is null)
+            {
+                return NotFound(new { error = "User not found" });
+            }
+
+            return Ok(user);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    /// <summary>
     /// Update user contact/name info (works for Customer or Employee)
     /// </summary>
-    [HttpPut("{id:int}/name")]
-    public async Task<IActionResult> UpdateUserNameAsync(int id, [FromBody] UpdateUserNameDto dto, CancellationToken cancellationToken)
+    [HttpPut("{userId:int}/name")]
+    public async Task<IActionResult> UpdateUserNameAsync(int userId, [FromBody] UpdateUserNameDto dto, CancellationToken cancellationToken)
     {
         try
         {
@@ -28,7 +51,7 @@ public class UserController : ControllerBase
                 return BadRequest(ModelState);
             }
 
-            dto.UserID = id;
+            dto.UserID = userId;
 
             var updated = await _userRepository.UpdateUserNameAsync(dto, cancellationToken);
 
@@ -48,8 +71,8 @@ public class UserController : ControllerBase
     /// <summary>
     /// Update user email info (works for Customer or Employee)
     /// </summary>
-    [HttpPut("{id:int}/email")]
-    public async Task<IActionResult> UpdateUserEmailAsync(int id, [FromBody] UpdateUserEmailDto dto, CancellationToken cancellationToken)
+    [HttpPut("{userId:int}/email")]
+    public async Task<IActionResult> UpdateUserEmailAsync(int userId, [FromBody] UpdateUserEmailDto dto, CancellationToken cancellationToken)
     {
         try
         {
@@ -58,7 +81,7 @@ public class UserController : ControllerBase
                 return BadRequest(ModelState);
             }
 
-            dto.UserID = id;
+            dto.UserID = userId;
 
             var updated = await _userRepository.UpdateUserEmailAsync(dto, cancellationToken);
 
@@ -78,8 +101,8 @@ public class UserController : ControllerBase
     /// <summary>
     /// Update user phone info (works for Customer or Employee)
     /// </summary>
-    [HttpPut("{id:int}/phone")]
-    public async Task<IActionResult> UpdateUserPhoneAsync(int id, [FromBody] UpdateUserPhoneDto dto, CancellationToken cancellationToken)
+    [HttpPut("{userId:int}/phone")]
+    public async Task<IActionResult> UpdateUserPhoneAsync(int userId, [FromBody] UpdateUserPhoneDto dto, CancellationToken cancellationToken)
     {
         try
         {
@@ -88,7 +111,7 @@ public class UserController : ControllerBase
                 return BadRequest(ModelState);
             }
 
-            dto.UserID = id;
+            dto.UserID = userId;
 
             var updated = await _userRepository.UpdateUserPhoneAsync(dto, cancellationToken);
 
@@ -108,8 +131,8 @@ public class UserController : ControllerBase
     /// <summary>
     /// Update user password (works for Customer or Employee)
     /// </summary>
-    [HttpPut("{id:int}/password")]
-    public async Task<IActionResult> UpdateUserPasswordAsync(int id, [FromBody] UpdateUserPasswordDto dto, CancellationToken cancellationToken)
+    [HttpPut("{userId:int}/password")]
+    public async Task<IActionResult> UpdateUserPasswordAsync(int userId, [FromBody] UpdateUserPasswordDto dto, CancellationToken cancellationToken)
     {
         try
         {
@@ -118,7 +141,8 @@ public class UserController : ControllerBase
                 return BadRequest(ModelState);
             }
 
-            dto.UserID = id;
+            // Set the userID in the DTO from the route parameter
+            dto.UserID = userId;
 
             var updated = await _userRepository.UpdateUserPasswordAsync(dto, cancellationToken);
 
