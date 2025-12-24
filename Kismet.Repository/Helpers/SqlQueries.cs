@@ -587,5 +587,108 @@ public static class CustomerPayment
         DELETE FROM dbo.[SavedBankInformation]
         WHERE SBIID = @SBIID";
 }
+
+
+public static class Fabric
+{
+    public const string GetAllFabrics = @"
+        SELECT 
+            FabricID,
+            FabricType,
+            Composition,
+            Color,
+            WeightPerUnit,
+            StockQuantity,
+            Description
+        FROM dbo.[Fabric]
+        ORDER BY FabricID";
+
+    public const string GetFabricById = @"
+        SELECT 
+            FabricID,
+            FabricType,
+            Composition,
+            Color,
+            WeightPerUnit,
+            StockQuantity,
+            Description
+        FROM dbo.[Fabric]
+        WHERE FabricID = @FabricID";
+
+    public const string InsertFabric = @"
+        INSERT INTO dbo.[Fabric] (FabricType, Composition, Color, WeightPerUnit, StockQuantity, Description)
+        VALUES (@FabricType, @Composition, @Color, @WeightPerUnit, @StockQuantity, @Description);
+        SELECT CAST(SCOPE_IDENTITY() as int);";
+
+    public const string UpdateFabricStock = @"
+        UPDATE dbo.[Fabric]
+        SET StockQuantity = StockQuantity + @QuantityChange
+        WHERE FabricID = @FabricID";
+}
+
+public static class Batch
+{
+    public const string GetBatchesForCustomer = @"
+        SELECT 
+            BatchNumber,
+            Quantity,
+            BatchPrice,
+            ProductionDate,
+            QualityGrade
+        FROM dbo.[Batch]
+        WHERE OrderID = @OrderID
+        ORDER BY BatchID";
+
+    public const string GetBatchesForEmployee = @"
+        SELECT 
+            BatchID,
+            OrderID,
+            ShipmentID,
+            FabricID,
+            BatchNumber,
+            Quantity,
+            BatchPrice,
+            ProductionDate,
+            QualityGrade,
+            CreatedAt
+        FROM dbo.[Batch]
+        WHERE OrderID = @OrderID
+        ORDER BY BatchID";
+
+    public const string GetBatchById = @"
+        SELECT 
+            BatchID,
+            OrderID,
+            ShipmentID,
+            FabricID,
+            BatchNumber,
+            Quantity,
+            BatchPrice,
+            ProductionDate,
+            QualityGrade,
+            CreatedAt
+        FROM dbo.[Batch]
+        WHERE BatchID = @BatchID";
+
+    public const string GetUnshippedBatches = @"
+        SELECT 
+            BatchID,
+            OrderID,
+            ShipmentID,
+            FabricID,
+            BatchNumber,
+            Quantity,
+            BatchPrice,
+            ProductionDate,
+            QualityGrade,
+            CreatedAt
+        FROM dbo.[Batch]
+        WHERE OrderID = @OrderID
+        AND ShipmentID IS NULL
+        ORDER BY BatchID";
+
+    // Stored procedure to create batches 
+    public const string CreateBatches = "dbo.CreateBatches";
+}
 }
 
