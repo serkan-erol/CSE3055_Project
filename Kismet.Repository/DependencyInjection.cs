@@ -22,9 +22,9 @@ public static class DependencyInjection
         services.AddScoped<ICustomerPaymentRepository, CustomerPaymentRepository>();
         //aaa services.AddScoped<IPaymentRepository, PaymentRepository>();
         services.AddScoped<IShipmentRepository, ShipmentRepository>();
-        //aaa services.AddScoped<IFabricRepository, FabricRepository>();
+        services.AddScoped<IFabricRepository, FabricRepository>();
         //aaa services.AddScoped<IUnitPriceRepository, UnitPriceRepository>();
-        //aaa services.AddScoped<IBatchRepository, BatchRepository>();
+        services.AddScoped<IBatchRepository, BatchRepository>();
         return services;
     }
 }
