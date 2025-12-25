@@ -55,9 +55,12 @@ Billing entry with the new transaction entry
 
 5 - Add a trigger to auto update a FT's TotalPaid when a Payment with that FT's FK is inserted
 
-.
-.
-.
+    6 - Make sure to create related Batch entries with every Order placed
+        6.1 - Customer chooses fabrics, clicks on place order and a batch is created for each and every fabric selected
+
+    .
+    .
+    .
 
 100 - Add Authorization, and Authentication!
     100.1 - Customers:

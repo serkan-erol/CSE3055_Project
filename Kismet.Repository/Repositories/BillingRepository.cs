@@ -104,6 +104,8 @@ public class BillingRepository : IBillingRepository
 
     /// <summary>
     /// Update the type of a billing
+    /// Redundant!!! We are opt NOT to update the BillingType.
+    /// We store same type FTs in the same type Billing entry.
     /// </summary>
     public async Task<BillingResponseToEmployeeDto> UpdateBillingTypeAsync(UpdateBillingTypeDto dto, CancellationToken cancellationToken = default)
     {

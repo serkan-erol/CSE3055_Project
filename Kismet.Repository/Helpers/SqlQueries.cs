@@ -768,36 +768,38 @@ public static class CustomerPayment
 }
 
 
-public static class Fabric
-{
-    public const string GetAllFabrics = @"
-        SELECT 
-            FabricID,
-            FabricType,
-            Composition,
-            Color,
-            WeightPerUnit,
-            StockQuantity,
-            Description
-        FROM dbo.[Fabric]
-        ORDER BY FabricID";
+    public static class Fabric
+    {
+        public const string GetAllFabrics = @"
+            SELECT 
+                FabricID,
+                FabricType,
+                Composition,
+                Color,
+                WeightPerUnit,
+                StockQuantity,
+                UnitPrice,
+                Description
+            FROM dbo.[Fabric]
+            ORDER BY FabricID";
 
-    public const string GetFabricById = @"
-        SELECT 
-            FabricID,
-            FabricType,
-            Composition,
-            Color,
-            WeightPerUnit,
-            StockQuantity,
-            Description
-        FROM dbo.[Fabric]
-        WHERE FabricID = @FabricID";
+        public const string GetFabricById = @"
+            SELECT 
+                FabricID,
+                FabricType,
+                Composition,
+                Color,
+                WeightPerUnit,
+                StockQuantity,
+                UnitPrice,
+                Description
+            FROM dbo.[Fabric]
+            WHERE FabricID = @FabricID";
 
-    public const string InsertFabric = @"
-        INSERT INTO dbo.[Fabric] (FabricType, Composition, Color, WeightPerUnit, StockQuantity, Description)
-        VALUES (@FabricType, @Composition, @Color, @WeightPerUnit, @StockQuantity, @Description);
-        SELECT CAST(SCOPE_IDENTITY() as int);";
+        public const string InsertFabric = @"
+            INSERT INTO dbo.[Fabric] (FabricType, Composition, Color, WeightPerUnit, StockQuantity, UnitPrice, Description)
+            VALUES (@FabricType, @Composition, @Color, @WeightPerUnit, @StockQuantity, @UnitPrice, @Description);
+            SELECT CAST(SCOPE_IDENTITY() as int);";
 
     public const string UpdateFabricStock = @"
         UPDATE dbo.[Fabric]

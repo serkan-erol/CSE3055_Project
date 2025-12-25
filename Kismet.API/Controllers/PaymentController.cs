@@ -158,6 +158,12 @@ public class PaymentController : ControllerBase
 
             dto.FTransactionID = fTransactionId;
 
+            // Check if Billing, FT and Payment types are compatible
+            if (billing.BillingType != financialTransaction.TransactionType || dto.PaymentType != financialTransaction.TransactionType)
+            {
+                return BadRequest(new { error = "Billing, Financial transaction and Payment types are not compatible" });
+            }
+
             // Create the payment
             var payment = await _paymentRepository.CreatePaymentAsync(dto, cancellationToken);
 

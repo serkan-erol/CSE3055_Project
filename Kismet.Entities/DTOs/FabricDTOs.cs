@@ -34,6 +34,9 @@ public class CreateFabricDto
     [Required]
     public int StockQuantity { get; set; }
 
+    [Required]
+    public decimal UnitPrice { get; set; }
+
     public string? Description { get; set; }
 }
 

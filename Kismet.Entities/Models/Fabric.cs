@@ -30,6 +30,10 @@ namespace Kismet.Entities.Models
         [Column("StockQuantity")]
         public int StockQuantity { get; set; }
 
+        [Required]
+        [Column("UnitPrice")]
+        public decimal UnitPrice { get; set; }
+
         [Column("Description")]
         public string? Description { get; set; }
     }
