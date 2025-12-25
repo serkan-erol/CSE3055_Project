@@ -101,13 +101,22 @@ public class OrderRepository : IOrderRepository
     }
     
     /// <summary>
-    /// Create a new order for a customer
+    /// Create a new order for a customer (without batches - batches are created separately)
     /// </summary>
     public async Task<OrderResponseToCustomerDto> CreateOrderAsync(CreateOrderDto dto, CancellationToken cancellationToken = default)
     {
         using var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken);
+        
+        // Create order with TotalAmount = 0 (batches will be created separately)
         var orderId = await connection.QuerySingleAsync<int>(
-            new CommandDefinition(SqlQueries.Order.InsertOrder, dto, cancellationToken: cancellationToken));
+            new CommandDefinition(
+                SqlQueries.Order.InsertOrder, 
+                new { 
+                    CustomerID = dto.CustomerID, 
+                    OrderType = dto.OrderType, 
+                    TotalAmount = 0m 
+                }, 
+                cancellationToken: cancellationToken));
         
         // Use the existing method to retrieve the order
         return await GetOrderByIdForCustomerAsync(dto.CustomerID, orderId, cancellationToken);

@@ -99,26 +99,19 @@ public class BatchController : ControllerBase
     }
 
     /// <summary>
-    /// Create batches for an order
-    /// Batches will be automatically created with up to 20 units each
+    /// Create batches for multiple fabrics
     /// </summary>
-    // [Authorize(Roles = "Employee")] // Commented out - no authorization
-    [HttpPost("create")]
-    public async Task<IActionResult> CreateBatches([FromBody] CreateBatchesDto dto, CancellationToken cancellationToken)
+    [HttpPost("create-multiple-fabrics/{orderId}")]
+    public async Task<IActionResult> CreateBatchesForMultipleFabrics(int orderId, [FromBody] CreateBatchesForMultipleFabricsDto dto, CancellationToken cancellationToken)
     {
         try
         {
-            var result = await _batchRepository.CreateBatchesAsync(dto, cancellationToken);
-
-            return Ok(new
-            {
-                message = result.Message,
-                result
-            });
+            var result = await _batchRepository.CreateBatchesForMultipleFabricsAsync(orderId, dto.FabricIDs, dto.Quantities, dto.QualityGrades, cancellationToken);
+            return Ok(result);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error creating batches for order {OrderId}", dto.OrderID);
+            _logger.LogError(ex, "Error creating batches for multiple fabrics for order {OrderId}", orderId);
             return StatusCode(500, new { message = ex.Message });
         }
     }

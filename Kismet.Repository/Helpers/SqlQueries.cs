@@ -596,14 +596,6 @@ public static class SqlQueries
                 LockedAt = sysdatetime()
             WHERE ShipmentID = @ShipmentID";
 
-        // Unlock shipment
-        public const string UnlockShipment = @"
-            UPDATE dbo.[Shipment]
-            SET 
-                IsLocked = 0,
-                LockedAt = NULL
-            WHERE ShipmentID = @ShipmentID";
-
         // Check if shipment is locked
         public const string CheckIfShipmentIsLocked = @"
             SELECT IsLocked
@@ -793,8 +785,8 @@ public static class SqlQueries
             WHERE FabricID = @FabricID";
 
         public const string InsertFabric = @"
-            INSERT INTO dbo.[Fabric] (FabricType, Composition, Color, WeightPerUnit, StockQuantity, Description)
-            VALUES (@FabricType, @Composition, @Color, @WeightPerUnit, @StockQuantity, @Description);
+            INSERT INTO dbo.[Fabric] (FabricType, Composition, Color, WeightPerUnit, StockQuantity, UnitPrice,Description)
+            VALUES (@FabricType, @Composition, @Color, @WeightPerUnit, @StockQuantity, @UnitPrice, @Description);
             SELECT CAST(SCOPE_IDENTITY() as int);";
 
         public const string UpdateFabricStock = @"
@@ -864,7 +856,13 @@ public static class SqlQueries
             AND ShipmentID IS NULL
             ORDER BY BatchID";
 
-        // Stored procedure to create batches 
-        public const string CreateBatches = "dbo.CreateBatches";
+        // Stored procedure to create batches for multiple fabrics
+        public const string CreateBatchesForMultipleFabrics = "dbo.CreateBatchesForMultipleFabrics";
+
+        // Query for calculating the total amount of an order
+        public const string CalculateOrderTotalAmount = @"
+            SELECT SUM(BatchPrice) as TotalAmount
+            FROM dbo.[Batch]
+            WHERE OrderID = @OrderID";
     }
 }

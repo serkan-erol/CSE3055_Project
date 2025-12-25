@@ -14,18 +14,24 @@ public class OrderController : ControllerBase
     private readonly IEmployeeRepository _employeeRepository;
     private readonly IFinancialTransactionRepository _financialTransactionRepository;
     private readonly IBillingRepository _billingRepository;
+    private readonly IBatchRepository _batchRepository;
+    private readonly IShipmentRepository _shipmentRepository;
 
     public OrderController(IOrderRepository orderRepository, 
                            ICustomerRepository customerRepository,
                            IEmployeeRepository employeeRepository,
                            IFinancialTransactionRepository financialTransactionRepository,
-                           IBillingRepository billingRepository)
+                           IBillingRepository billingRepository,
+                           IBatchRepository batchRepository,
+                           IShipmentRepository shipmentRepository)
     {
         _orderRepository = orderRepository;
         _customerRepository = customerRepository;
         _employeeRepository = employeeRepository;
         _financialTransactionRepository = financialTransactionRepository;
         _billingRepository = billingRepository;
+        _batchRepository = batchRepository;
+        _shipmentRepository = shipmentRepository;
     }
 
     /// <summary>
@@ -192,12 +198,6 @@ public class OrderController : ControllerBase
                 return BadRequest(ModelState);
             }
 
-            //aaa Check if the CustomerID in the DTO matches the CustomerID in the URL
-            //if (dto.CustomerID != customerId)
-            //{
-            //    return BadRequest(new { error = "Customer ID mismatch" });
-            //}
-
             // Check if the customer exists before creating the order
             var customer = await _customerRepository.GetByIdDtoAsync(customerId, cancellationToken);
             if (customer is null)
@@ -208,9 +208,32 @@ public class OrderController : ControllerBase
             // Set the customer ID
             dto.CustomerID = customerId;
 
-            // Create the order
+            // Validate that FabricIDs and Quantities are provided and match
+            if (dto.FabricIDs == null || dto.Quantities == null || dto.FabricIDs.Count == 0 || dto.Quantities.Count == 0)
+            {
+                return BadRequest(new { error = "FabricIDs and Quantities must be provided and cannot be empty" });
+            }
+
+            if (dto.FabricIDs.Count != dto.Quantities.Count)
+            {
+                return BadRequest(new { error = "FabricIDs and Quantities must have the same count" });
+            }
+
+            // Create the order first (with TotalAmount = 0)
             var order = await _orderRepository.CreateOrderAsync(dto, cancellationToken);
 
+            // Create batches for all fabrics
+            await _batchRepository.CreateBatchesForMultipleFabricsAsync(
+                order.OrderID, 
+                dto.FabricIDs, 
+                dto.Quantities, 
+                dto.QualityGrades, 
+                cancellationToken);
+
+            // Get the updated order to retrieve the calculated TotalAmount
+            // A trigger has updated it based on batch prices
+            var updatedOrder = await _orderRepository.GetOrderByIdForCustomerAsync(customerId, order.OrderID, cancellationToken);
+            
             // Create the associated financial transaction
             var financialTransactionDto = new CreateFTDto
             {
@@ -218,7 +241,7 @@ public class OrderController : ControllerBase
                 BillingID = 0,
                 OrderID = order.OrderID,
                 TransactionType = dto.OrderType,
-                TotalAmount = dto.TotalAmount,
+                TotalAmount = updatedOrder.TotalAmount, // Use the calculated TotalAmount from the order
                 TransactionDate = DateTime.UtcNow.Date.AddDays(-1),
             };
 
@@ -251,7 +274,7 @@ public class OrderController : ControllerBase
                 var updateBillingDto = new UpdateBillingDto
                 {
                     BillingID = suitableBillingEntry.BillingID,
-                    TotalDue = dto.TotalAmount,
+                    TotalDue = updatedOrder.TotalAmount,
                 };
                 await _billingRepository.UpdateBillingAsync(customerId, suitableBillingEntry.BillingID, updateBillingDto, cancellationToken);
             }
@@ -259,8 +282,8 @@ public class OrderController : ControllerBase
             // Create the financial transaction
             await _financialTransactionRepository.CreateFTAsync(financialTransactionDto, cancellationToken);
 
-            // Return the order
-            return Ok(order);
+            // Return the updated order (with calculated TotalAmount)
+            return Ok(updatedOrder);
         }
         catch (Exception ex)
         {
@@ -384,6 +407,9 @@ public class OrderController : ControllerBase
 
             // Approve the order
             var approvedOrder = await _orderRepository.ApproveOrderAsync(dto, cancellationToken);
+
+            //Create the Shipments for the order
+            await _shipmentRepository.ShipOrderAsync(new ShipOrderDto { OrderID = approvedOrder.OrderID, EmployeeID = employeeId }, cancellationToken);
 
             // Return the approved order
             return Ok(approvedOrder);

@@ -71,7 +71,7 @@ CREATE TABLE dbo.[SavedPaymentMethod] (
     SPMID                int IDENTITY PRIMARY KEY,
     CustomerID           int NOT NULL,
     -- Result of an encoding process with a special key can be recorded in CardNumber for security purposes
-    CardNumber           nvarchar(255) NOT NULL,
+    CardNumber           nvarchar(255) NOT NULL UNIQUE,
     CardType             nvarchar(20) NOT NULL CHECK (CardType IN ('Debit', 'Credit')),
     CardExpirationDate   date NOT NULL,
     RecordExpirationDate date NULL,
@@ -130,7 +130,8 @@ CREATE TABLE dbo.[Order] (
     OrderNumber     nvarchar(50) NOT NULL DEFAULT 'Order00000',
     -- 'Purchase' for the customer buying from us and 'Supply' for us buying from the customer
     OrderType       nvarchar(8) NOT NULL CHECK (OrderType IN ('Purchase', 'Supply')),
-    TotalAmount     decimal(18, 2) NOT NULL CHECK (TotalAmount > 0),
+    -- TotalAmount is 0 by default until the order is approved and the batches are created
+    TotalAmount     decimal(18, 2) NOT NULL CHECK (TotalAmount >= 0),
     -- 0 = Pending, 1 = Approved, 2 = Shipped, 3 = Delivered, and 4 = Cancelled
     OrderStatus     int NOT NULL DEFAULT 0 CHECK (OrderStatus BETWEEN 0 AND 4),
     IsApproved      bit NOT NULL DEFAULT 0,
@@ -514,9 +515,9 @@ BEGIN
     
     UPDATE dbo.[Billing]
     SET BillingStatus = CASE
-        WHEN TotalDue = TotalPaid THEN 2
-        WHEN TotalDue > TotalPaid THEN 1
-        WHEN TotalPaid = 0 THEN 0
+        WHEN TotalPaid = 0 THEN 0  -- Unpaid: No payments made yet
+        WHEN TotalDue = TotalPaid THEN 2  -- Paid: Fully paid
+        WHEN TotalDue > TotalPaid THEN 1  -- Partial: Some payment made but not fully paid
         ELSE -1 -- This should never happen! It is just a fallback to see if there are any erros in the logic
     END
     WHERE BillingID = @BillingID;
@@ -531,9 +532,9 @@ BEGIN
     SET NOCOUNT ON;
       UPDATE dbo.[FinancialTransaction]
     SET PaymentStatus = CASE
+        WHEN TotalPaid = 0 THEN 0
         WHEN TotalAmount = TotalPaid THEN 2
         WHEN TotalAmount > TotalPaid THEN 1
-        WHEN TotalPaid = 0 THEN 0
         ELSE -1 -- This should never happen! It is just a fallback to see if there are any erros in the logic
     END
     WHERE FTransactionID = @FTransactionID;
@@ -631,6 +632,7 @@ BEGIN
         END
 
         -- Update order status to Shipped (2)
+        --aaa We may remove this, and add a trigger to update the order status to Shipped (2) when the last shipment is updated to In Transit (1)
         UPDATE dbo.[Order]
         SET OrderStatus = 2
         WHERE OrderID = @OrderID;
@@ -659,157 +661,237 @@ GO
 
 --------------------------------------------------------------------------------------------------------------------------------
 
--- Procedure to create batches for an order
-CREATE OR ALTER PROCEDURE dbo.CreateBatches
+-- Create batches for multiple fabrics in an existing order
+CREATE OR ALTER PROCEDURE dbo.CreateBatchesForMultipleFabrics
     @OrderID int,
-    @FabricID int,
-    @TotalFabricUnits int,
-    @QualityGrade nvarchar(50) = NULL
+    @FabricItemsJson nvarchar(MAX)  -- JSON array: [{"FabricID":1,"TotalFabricUnits":10,"QualityGrade":"A"},...]
 AS
 BEGIN
     SET NOCOUNT ON;
 
-    -- Check if batches already exist for this order
-    IF EXISTS (SELECT 1 FROM dbo.[Batch] WHERE OrderID = @OrderID)
+    -- Validate OrderID exists
+    IF NOT EXISTS (SELECT 1 FROM dbo.[Order] WHERE OrderID = @OrderID)
     BEGIN
-        RAISERROR('already batched !', 16, 1);
+        RAISERROR('Order with ID %d not found', 16, 1, @OrderID);
         RETURN;
     END
 
-    IF @TotalFabricUnits < 1
+    -- Parse JSON and validate that at least one fabric item is provided
+    IF @FabricItemsJson IS NULL OR LEN(LTRIM(RTRIM(@FabricItemsJson))) = 0
     BEGIN
-        RAISERROR('Total fabric units must be at least 1', 16, 1);
+        RAISERROR('Fabric items JSON must be provided', 16, 1);
         RETURN;
     END
 
-    DECLARE @UnitPrice int;
+    -- Create a temporary table to hold fabric items
+    CREATE TABLE #FabricItems (
+        FabricID int NOT NULL,
+        TotalFabricUnits int NOT NULL,
+        QualityGrade nvarchar(50) NULL
+    );
 
-    SELECT @UnitPrice = UnitPrice
-    FROM dbo.[Fabric]
-    WHERE FabricID = @FabricID;
-
-    IF @UnitPrice IS NULL
-    BEGIN
-        RAISERROR('Fabric not found', 16, 1);
-        RETURN;
-    END
-
-    DECLARE @Remaining int = @TotalFabricUnits;
-    DECLARE @BatchQty int;
-    DECLARE @BatchPrice decimal(18,2);
-    DECLARE @Counter int = 1;
-    DECLARE @BatchNumber nvarchar(50);
-    DECLARE @ProductionDate date = CAST(GETDATE() AS date);
-
-    WHILE @Remaining > 0
-    BEGIN
-        SET @BatchQty = CASE WHEN @Remaining >= 20 THEN 20 ELSE @Remaining END;
-        SET @BatchPrice = @BatchQty * @UnitPrice;
-
-        SET @BatchNumber =
-            'BATCH-' + FORMAT(GETDATE(), 'yyyyMMddHHmmss') + '-' +
-            RIGHT('000' + CAST(@Counter AS varchar(3)), 3);
-
-        INSERT INTO dbo.[Batch] (
-            OrderID,
-            ShipmentID,
+    -- Parse JSON into temporary table
+    BEGIN TRY
+        INSERT INTO #FabricItems (FabricID, TotalFabricUnits, QualityGrade)
+        SELECT 
             FabricID,
-            BatchNumber,
-            Quantity,
-            BatchPrice,
-            ProductionDate,
+            TotalFabricUnits,
             QualityGrade
-        )
-        VALUES (
-            @OrderID,
-            NULL,
-            @FabricID,
-            @BatchNumber,
-            @BatchQty,
-            @BatchPrice,
-            @ProductionDate,
-            @QualityGrade
+        FROM OPENJSON(@FabricItemsJson)
+        WITH (
+            FabricID int '$.FabricID',
+            TotalFabricUnits int '$.TotalFabricUnits',
+            QualityGrade nvarchar(50) '$.QualityGrade'
         );
+    END TRY
+    BEGIN CATCH
+        DROP TABLE #FabricItems;
+        RAISERROR('Invalid JSON format for fabric items', 16, 1);
+        RETURN;
+    END CATCH
 
-        SET @Remaining -= @BatchQty;
-        SET @Counter += 1;
-    END
-END;
-GO
-
---------------------------------------------------------------------------------------------------------------------------------
-
--- Create order with batches 
-CREATE OR ALTER PROCEDURE dbo.CreateOrderWithBatches
-    @CustomerID int,
-    @OrderType nvarchar(8),   -- Purchase / Supply
-    @FabricID int,
-    @TotalFabricUnits int,
-    @QualityGrade nvarchar(50) = NULL
-AS
-BEGIN
-    SET NOCOUNT ON;
-
-    IF @TotalFabricUnits < 1
+    -- Validate that at least one fabric item is provided
+    IF NOT EXISTS (SELECT 1 FROM #FabricItems)
     BEGIN
-        RAISERROR('Quantity must be at least 1', 16, 1);
+        DROP TABLE #FabricItems;
+        RAISERROR('At least one fabric item must be provided', 16, 1);
         RETURN;
     END
 
+    -- Get OrderType to determine if this is Purchase or Supply
+    DECLARE @OrderType nvarchar(50);
+    SELECT @OrderType = OrderType
+    FROM dbo.[Order]
+    WHERE OrderID = @OrderID;
+
+    IF @OrderType IS NULL
+    BEGIN
+        DROP TABLE #FabricItems;
+        RAISERROR('OrderType not found for OrderID %d', 16, 1, @OrderID);
+        RETURN;
+    END
+
+    -- Validate all fabric items
+    DECLARE @FabricID int;
+    DECLARE @TotalFabricUnits int;
     DECLARE @CurrentStock int;
+    DECLARE @QualityGrade nvarchar(50);
 
-    SELECT @CurrentStock = StockQuantity
-    FROM dbo.[Fabric]
-    WHERE FabricID = @FabricID;
+    DECLARE fabric_for_batch_cursor CURSOR FOR
+        SELECT FabricID, TotalFabricUnits, QualityGrade
+        FROM #FabricItems;
 
-    IF @CurrentStock IS NULL
+    OPEN fabric_for_batch_cursor;
+    FETCH NEXT FROM fabric_for_batch_cursor INTO @FabricID, @TotalFabricUnits, @QualityGrade;
+
+    WHILE @@FETCH_STATUS = 0
     BEGIN
-        RAISERROR('Fabric not found', 16, 1);
-        RETURN;
+        -- Validate quantity
+        IF @TotalFabricUnits < 1
+        BEGIN
+            CLOSE fabric_for_batch_cursor;
+            DEALLOCATE fabric_for_batch_cursor;
+            DROP TABLE #FabricItems;
+            RAISERROR('Quantity must be at least 1 for all fabric items', 16, 1);
+            RETURN;
+        END
+
+        -- Check if fabric exists and get stock
+        SELECT @CurrentStock = StockQuantity
+        FROM dbo.[Fabric]
+        WHERE FabricID = @FabricID;
+
+        IF @CurrentStock IS NULL
+        BEGIN
+            CLOSE fabric_for_batch_cursor;
+            DEALLOCATE fabric_for_batch_cursor;
+            DROP TABLE #FabricItems;
+            RAISERROR('Fabric with ID %d not found', 16, 1, @FabricID);
+            RETURN;
+        END
+
+        -- Check stock availability ONLY for Purchase orders (we're selling fabric)
+        -- For Supply orders, we're receiving fabric, so no stock check needed
+        IF @OrderType = 'Purchase' AND @CurrentStock < @TotalFabricUnits
+        BEGIN
+            CLOSE fabric_for_batch_cursor;
+            DEALLOCATE fabric_for_batch_cursor;
+            DROP TABLE #FabricItems;
+            RAISERROR('Insufficient fabric stock for FabricID %d. Available: %d, Requested: %d', 16, 1, @FabricID, @CurrentStock, @TotalFabricUnits);
+            RETURN;
+        END
+
+        FETCH NEXT FROM fabric_for_batch_cursor INTO @FabricID, @TotalFabricUnits, @QualityGrade;
     END
 
-    IF @CurrentStock < @TotalFabricUnits
-    BEGIN
-        RAISERROR('Insufficient fabric stock', 16, 1);
-        RETURN;
-    END
+    CLOSE fabric_for_batch_cursor;
+    DEALLOCATE fabric_for_batch_cursor;
 
     BEGIN TRANSACTION;
     BEGIN TRY
-        DECLARE @OrderID int;
+        -- Process each fabric item: update stock and create batches
+        DECLARE fabric_for_batch_cursor2 CURSOR FOR
+            SELECT FabricID, TotalFabricUnits, QualityGrade
+            FROM #FabricItems;
 
-        -- 1. Create order
-        INSERT INTO dbo.[Order] (
-            CustomerID,
-            OrderType
-        )
-        VALUES (
-            @CustomerID,
-            @OrderType
-        );
+        OPEN fabric_for_batch_cursor2;
+        FETCH NEXT FROM fabric_for_batch_cursor2 INTO @FabricID, @TotalFabricUnits, @QualityGrade;
 
-        SET @OrderID = SCOPE_IDENTITY();
+        WHILE @@FETCH_STATUS = 0
+        BEGIN
+            -- Update stock based on OrderType
+            -- Purchase: Subtract stock (we're selling fabric to customer)
+            -- Supply: Add stock (we're receiving fabric from customer)
+            IF @OrderType = 'Purchase'
+            BEGIN
+                UPDATE dbo.[Fabric]
+                SET StockQuantity = StockQuantity - @TotalFabricUnits
+                WHERE FabricID = @FabricID;
+            END
+            ELSE IF @OrderType = 'Supply'
+            BEGIN
+                UPDATE dbo.[Fabric]
+                SET StockQuantity = StockQuantity + @TotalFabricUnits
+                WHERE FabricID = @FabricID;
+            END
 
-        -- 2. Update stock
-        UPDATE dbo.[Fabric]
-        SET StockQuantity = StockQuantity - @TotalFabricUnits
-        WHERE FabricID = @FabricID;
+            -- Create batches for this fabric (trigger will update TotalAmount automatically)
+            -- Note: We need to call CreateBatches without the "already batched" check
+            -- So we'll create batches directly here
+            DECLARE @UnitPrice decimal(18, 2);
+            SELECT @UnitPrice = UnitPrice
+            FROM dbo.[Fabric]
+            WHERE FabricID = @FabricID;
 
-        -- 3. Create batches
-        EXEC dbo.CreateBatches
-            @OrderID = @OrderID,
-            @FabricID = @FabricID,
-            @TotalFabricUnits = @TotalFabricUnits,
-            @QualityGrade = @QualityGrade;
+            DECLARE @Remaining int = @TotalFabricUnits;
+            DECLARE @BatchQty int;
+            DECLARE @BatchPrice decimal(18,2);
+            DECLARE @Counter int = 1;
+            DECLARE @BatchNumber nvarchar(50);
+            DECLARE @ProductionDate date = CAST(GETDATE() AS date);
+
+            WHILE @Remaining > 0
+            BEGIN
+                SET @BatchQty = CASE WHEN @Remaining >= 20 THEN 20 ELSE @Remaining END;
+                SET @BatchPrice = @BatchQty * @UnitPrice;
+
+                -- Generate unique BatchNumber using timestamp + GUID + counter to ensure uniqueness
+                -- Generate new GUID for each batch to guarantee uniqueness
+                DECLARE @UniqueGuid nvarchar(36) = REPLACE(CAST(NEWID() AS nvarchar(36)), '-', '');
+                SET @BatchNumber =
+                    'BATCH-' + FORMAT(GETDATE(), 'yyyyMMddHHmmss') + '-' +
+                    SUBSTRING(@UniqueGuid, 1, 8) + '-' +
+                    RIGHT('000' + CAST(@Counter AS varchar(3)), 3);
+
+                INSERT INTO dbo.[Batch] (
+                    OrderID,
+                    ShipmentID,
+                    FabricID,
+                    BatchNumber,
+                    Quantity,
+                    BatchPrice,
+                    ProductionDate,
+                    QualityGrade
+                )
+                VALUES (
+                    @OrderID,
+                    NULL,
+                    @FabricID,
+                    @BatchNumber,
+                    @BatchQty,
+                    @BatchPrice,
+                    @ProductionDate,
+                    @QualityGrade
+                );
+
+                SET @Remaining -= @BatchQty;
+                SET @Counter += 1;
+            END
+
+            FETCH NEXT FROM fabric_for_batch_cursor2 INTO @FabricID, @TotalFabricUnits, @QualityGrade;
+        END
+
+        CLOSE fabric_for_batch_cursor2;
+        DEALLOCATE fabric_for_batch_cursor2;
+
+        DROP TABLE #FabricItems;
 
         COMMIT TRANSACTION;
-
-        SELECT @OrderID AS OrderID;
 
     END TRY
     BEGIN CATCH
         IF @@TRANCOUNT > 0
             ROLLBACK TRANSACTION;
+        
+        IF CURSOR_STATUS('global', 'fabric_for_batch_cursor2') >= 0
+        BEGIN
+            CLOSE fabric_for_batch_cursor2;
+            DEALLOCATE fabric_for_batch_cursor2;
+        END
+        
+        IF OBJECT_ID('tempdb..#FabricItems') IS NOT NULL
+            DROP TABLE #FabricItems;
+        
         THROW;
     END CATCH
 END;
@@ -981,14 +1063,14 @@ BEGIN
     DECLARE @NewStatus int;
     DECLARE @OldIsLocked bit;
     
-    DECLARE shipment_cursor CURSOR FOR
+    DECLARE shipment_islocked_cursor CURSOR FOR
         SELECT i.ShipmentID, d.ShipmentStatus, i.ShipmentStatus, d.IsLocked
         FROM inserted i
         INNER JOIN deleted d ON i.ShipmentID = d.ShipmentID
         WHERE i.ShipmentStatus <> d.ShipmentStatus;
     
-    OPEN shipment_cursor;
-    FETCH NEXT FROM shipment_cursor INTO @ShipmentID, @OldStatus, @NewStatus, @OldIsLocked;
+    OPEN shipment_islocked_cursor;
+    FETCH NEXT FROM shipment_islocked_cursor INTO @ShipmentID, @OldStatus, @NewStatus, @OldIsLocked;
     
     WHILE @@FETCH_STATUS = 0
     BEGIN
@@ -1003,11 +1085,11 @@ BEGIN
             @LockStatus2 = 3,  -- Failed
             @OldIsLocked = @OldIsLocked;
         
-        FETCH NEXT FROM shipment_cursor INTO @ShipmentID, @OldStatus, @NewStatus, @OldIsLocked;
+        FETCH NEXT FROM shipment_islocked_cursor INTO @ShipmentID, @OldStatus, @NewStatus, @OldIsLocked;
     END
     
-    CLOSE shipment_cursor;
-    DEALLOCATE shipment_cursor;
+    CLOSE shipment_islocked_cursor;
+    DEALLOCATE shipment_islocked_cursor;
 END;
 GO
 
@@ -1029,7 +1111,9 @@ BEGIN
         WHERE d.IsLocked = 1 AND (
              (i.OrderStatus <> d.OrderStatus) OR
              (i.IsApproved <> d.IsApproved) OR
-             (i.ApprovedBy <> d.ApprovedBy))
+             (i.ApprovedBy <> d.ApprovedBy) OR
+             (i.ApprovalDate <> d.ApprovalDate) OR
+             (i.IsLocked <> d.IsLocked))
     )
     BEGIN
         ROLLBACK TRANSACTION;
@@ -1054,8 +1138,10 @@ BEGIN
         SELECT 1 FROM inserted i
         INNER JOIN deleted d ON i.ShipmentID = d.ShipmentID
         WHERE d.IsLocked = 1 AND (
+             (i.CustomsDocRef <> d.CustomsDocRef) OR
              (i.ShipmentStatus <> d.ShipmentStatus) OR
              (i.IsLocked <> d.IsLocked) OR
+             (i.ExpectedDeliveryDate <> d.ExpectedDeliveryDate) OR
              (i.ActualDeliveryDate <> d.ActualDeliveryDate))
     )
     BEGIN
@@ -1068,6 +1154,10 @@ GO
 --------------------------------------------------------------------------------------------------------------------------------
 
 -- Trigger to prevent approving orders for unreliable customers with unpaid billings
+
+-- If the customer is unreliable and has unpaid billings
+-- We check the total RemainingBalance for Purchase type billings (customer owes us) and    
+-- Supply type billings (we owe customer) and prevent approval if the customer owes us more than we owe them
 CREATE TRIGGER dbo.trg_PreventApproval_UnreliableCustomer_UnpaidBillings
 ON dbo.[Order]
 AFTER UPDATE
@@ -1076,24 +1166,28 @@ BEGIN
     SET NOCOUNT ON;
     
     -- Only check when order is being approved (IsApproved changes from 0 to 1 or ApprovedBy is being set)
+    -- Only check Purchase orders, not Supply orders
     IF EXISTS (
         SELECT 1 FROM inserted i
         INNER JOIN deleted d ON i.OrderID = d.OrderID
         WHERE ((i.IsApproved = 1 AND d.IsApproved = 0) OR 
                (i.ApprovedBy IS NOT NULL AND d.ApprovedBy IS NULL))
+          AND i.OrderType = 'Purchase'
     )
     BEGIN
         DECLARE @CustomerID int;
         DECLARE @ReliabilityStatus bit;
-        DECLARE @UnpaidBillingsCount int;
+        DECLARE @PurchaseRemainingBalance decimal(18, 2);  -- Customer owes us
+        DECLARE @SupplyRemainingBalance decimal(18, 2);    -- We owe customer
         
-        -- Check each order being approved
+        -- Check each Purchase order being approved
         DECLARE approval_cursor CURSOR FOR
             SELECT DISTINCT i.CustomerID
             FROM inserted i
             INNER JOIN deleted d ON i.OrderID = d.OrderID
             WHERE ((i.IsApproved = 1 AND d.IsApproved = 0) OR 
-                   (i.ApprovedBy IS NOT NULL AND d.ApprovedBy IS NULL));
+                   (i.ApprovedBy IS NOT NULL AND d.ApprovedBy IS NULL))
+              AND i.OrderType = 'Purchase';
         
         OPEN approval_cursor;
         FETCH NEXT FROM approval_cursor INTO @CustomerID;
@@ -1105,20 +1199,32 @@ BEGIN
             FROM dbo.[Customer]
             WHERE CustomerID = @CustomerID;
             
-            -- If customer is unreliable, check for unpaid billings
+            -- If customer is unreliable, check billing balances
             IF @ReliabilityStatus = 0
             BEGIN
-                -- Count unpaid billings (BillingStatus != 2 means not fully paid)
-                SELECT @UnpaidBillingsCount = COUNT(*)
+                -- Calculate total RemainingBalance for Purchase type billings (customer owes us)
+                SELECT @PurchaseRemainingBalance = ISNULL(SUM(RemainingBalance), 0)
                 FROM dbo.[Billing]
                 WHERE CustomerID = @CustomerID
-                  AND BillingStatus != 2;
+                  AND BillingType = 'Purchase';
                 
-                -- If there are unpaid billings, prevent approval
-                IF @UnpaidBillingsCount > 0
+                -- Calculate total RemainingBalance for Supply type billings (we owe customer)
+                SELECT @SupplyRemainingBalance = ISNULL(SUM(RemainingBalance), 0)
+                FROM dbo.[Billing]
+                WHERE CustomerID = @CustomerID
+                  AND BillingType = 'Supply';
+                
+                -- If customer owes us more than we owe them, prevent approval
+                IF @PurchaseRemainingBalance > @SupplyRemainingBalance
                 BEGIN
                     ROLLBACK TRANSACTION;
-                    RAISERROR('Cannot approve order: Customer is unreliable and has %d unpaid billing(s). All billings must be paid before approval.', 16, 1, @UnpaidBillingsCount);
+                    DECLARE @ErrorMessage nvarchar(500);
+                    SET @ErrorMessage = 'Cannot approve order: Customer owes more than we owe them. Customer owes ' + 
+                                       CAST(@PurchaseRemainingBalance AS nvarchar(20)) + 
+                                       ' TL (Purchase billings) and we owe ' + 
+                                       CAST(@SupplyRemainingBalance AS nvarchar(20)) + 
+                                       ' TL (Supply billings). Customer must pay their outstanding balance before approving this order.';
+                    RAISERROR(@ErrorMessage, 16, 1);
                     RETURN;
                 END
             END
@@ -1141,7 +1247,7 @@ AFTER UPDATE
 AS
 BEGIN
     SET NOCOUNT ON;
-    
+
     -- Only process when OrderStatus changes to 4 (Cancelled)
     IF EXISTS (
         SELECT 1 FROM inserted i
@@ -1154,28 +1260,28 @@ BEGIN
         DECLARE @FTransactionID int;
         
         -- Process each cancelled order
-        DECLARE order_cursor CURSOR FOR
+        DECLARE order_cancelled_cursor CURSOR FOR
             SELECT DISTINCT i.OrderID
             FROM inserted i
             INNER JOIN deleted d ON i.OrderID = d.OrderID
             WHERE i.OrderStatus = 4 
               AND d.OrderStatus != 4;
         
-        OPEN order_cursor;
-        FETCH NEXT FROM order_cursor INTO @OrderID;
+        OPEN order_cancelled_cursor;
+        FETCH NEXT FROM order_cancelled_cursor INTO @OrderID;
         
         WHILE @@FETCH_STATUS = 0
         BEGIN
             DECLARE @BillingID int;
             
             -- Get all FinancialTransaction IDs for this order
-            DECLARE ft_cursor CURSOR FOR
+            DECLARE ft_delete_cursor CURSOR FOR
                 SELECT FTransactionID
                 FROM dbo.[FinancialTransaction]
                 WHERE OrderID = @OrderID;
             
-            OPEN ft_cursor;
-            FETCH NEXT FROM ft_cursor INTO @FTransactionID;
+            OPEN ft_delete_cursor;
+            FETCH NEXT FROM ft_delete_cursor INTO @FTransactionID;
             
             WHILE @@FETCH_STATUS = 0
             BEGIN
@@ -1234,17 +1340,17 @@ BEGIN
                     EXEC dbo.Update_BillingStatus @BillingID = @BillingID;
                 END
                 
-                FETCH NEXT FROM ft_cursor INTO @FTransactionID;
+                FETCH NEXT FROM ft_delete_cursor INTO @FTransactionID;
             END
             
-            CLOSE ft_cursor;
-            DEALLOCATE ft_cursor;
+            CLOSE ft_delete_cursor;
+            DEALLOCATE ft_delete_cursor;
             
-            FETCH NEXT FROM order_cursor INTO @OrderID;
+            FETCH NEXT FROM order_cancelled_cursor INTO @OrderID;
         END
         
-        CLOSE order_cursor;
-        DEALLOCATE order_cursor;
+        CLOSE order_cancelled_cursor;
+        DEALLOCATE order_cancelled_cursor;
     END
 END;
 GO
@@ -1300,20 +1406,20 @@ BEGIN
     
     -- Update BillingStatus for affected Billings
     DECLARE @BillingID int;
-    DECLARE billing_cursor CURSOR FOR
+    DECLARE billing_ft_insert_cursor CURSOR FOR
         SELECT DISTINCT BillingID FROM inserted;
     
-    OPEN billing_cursor;
-    FETCH NEXT FROM billing_cursor INTO @BillingID;
+    OPEN billing_ft_insert_cursor;
+    FETCH NEXT FROM billing_ft_insert_cursor INTO @BillingID;
     
     WHILE @@FETCH_STATUS = 0
     BEGIN
         EXEC dbo.Update_BillingStatus @BillingID = @BillingID;
-        FETCH NEXT FROM billing_cursor INTO @BillingID;
+        FETCH NEXT FROM billing_ft_insert_cursor INTO @BillingID;
     END
     
-    CLOSE billing_cursor;
-    DEALLOCATE billing_cursor;
+    CLOSE billing_ft_insert_cursor;
+    DEALLOCATE billing_ft_insert_cursor;
 END;
 GO
 
@@ -1359,22 +1465,22 @@ BEGIN
         
         -- Update BillingStatus for affected Billings
         DECLARE @BillingID int;
-        DECLARE billing_cursor CURSOR FOR
+        DECLARE billing_ft_update_cursor CURSOR FOR
             SELECT DISTINCT BillingID FROM inserted
             UNION
             SELECT DISTINCT BillingID FROM deleted;
         
-        OPEN billing_cursor;
-        FETCH NEXT FROM billing_cursor INTO @BillingID;
+        OPEN billing_ft_update_cursor;
+        FETCH NEXT FROM billing_ft_update_cursor INTO @BillingID;
         
         WHILE @@FETCH_STATUS = 0
         BEGIN
             EXEC dbo.Update_BillingStatus @BillingID = @BillingID;
-            FETCH NEXT FROM billing_cursor INTO @BillingID;
+            FETCH NEXT FROM billing_ft_update_cursor INTO @BillingID;
         END
         
-        CLOSE billing_cursor;
-        DEALLOCATE billing_cursor;
+        CLOSE billing_ft_update_cursor;
+        DEALLOCATE billing_ft_update_cursor;
     END
 END;
 GO
@@ -1414,24 +1520,22 @@ BEGIN
     
     -- Update BillingStatus for affected Billings
     DECLARE @BillingID int;
-    DECLARE billing_cursor CURSOR FOR
+    DECLARE billing_ft_delete_cursor CURSOR FOR
         SELECT DISTINCT BillingID FROM deleted;
     
-    OPEN billing_cursor;
-    FETCH NEXT FROM billing_cursor INTO @BillingID;
+    OPEN billing_ft_delete_cursor;
+    FETCH NEXT FROM billing_ft_delete_cursor INTO @BillingID;
     
     WHILE @@FETCH_STATUS = 0
     BEGIN
         EXEC dbo.Update_BillingStatus @BillingID = @BillingID;
-        FETCH NEXT FROM billing_cursor INTO @BillingID;
+        FETCH NEXT FROM billing_ft_delete_cursor INTO @BillingID;
     END
     
-    CLOSE billing_cursor;
-    DEALLOCATE billing_cursor;
+    CLOSE billing_ft_delete_cursor;
+    DEALLOCATE billing_ft_delete_cursor;
 END;
 GO
-
-
 
 ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -1460,13 +1564,13 @@ BEGIN
     
     -- Process each inserted FinancialTransaction
     DECLARE @TotalPaid decimal(18, 2);
-    DECLARE ft_cursor CURSOR FOR
+    DECLARE ft_treasury_cursor CURSOR FOR
         SELECT FTransactionID, TotalPaid, TransactionType
         FROM inserted
         ORDER BY FTransactionID;
     
-    OPEN ft_cursor;
-    FETCH NEXT FROM ft_cursor INTO @FTransactionID, @TotalPaid, @TransactionType;
+    OPEN ft_treasury_cursor;
+    FETCH NEXT FROM ft_treasury_cursor INTO @FTransactionID, @TotalPaid, @TransactionType;
     
     WHILE @@FETCH_STATUS = 0
     BEGIN
@@ -1486,11 +1590,11 @@ BEGIN
         -- Update current balance for next iteration
         SET @CurrentBalance = @BalanceAfter;
         
-        FETCH NEXT FROM ft_cursor INTO @FTransactionID, @TotalPaid, @TransactionType;
+        FETCH NEXT FROM ft_treasury_cursor INTO @FTransactionID, @TotalPaid, @TransactionType;
     END
     
-    CLOSE ft_cursor;
-    DEALLOCATE ft_cursor;
+    CLOSE ft_treasury_cursor;
+    DEALLOCATE ft_treasury_cursor;
 END;
 GO
 
@@ -1520,14 +1624,14 @@ BEGIN
         DECLARE @NewBalanceAfter decimal(18, 2);
         
         -- Process each updated FinancialTransaction
-        DECLARE ft_cursor CURSOR FOR
+        DECLARE ft_treasury_update_cursor CURSOR FOR
             SELECT i.FTransactionID, d.TotalPaid, i.TotalPaid, i.TransactionType
             FROM inserted i
             INNER JOIN deleted d ON i.FTransactionID = d.FTransactionID
             WHERE i.TotalPaid <> d.TotalPaid;
         
-        OPEN ft_cursor;
-        FETCH NEXT FROM ft_cursor INTO @FTransactionID, @OldTotalPaid, @NewTotalPaid, @TransactionType;
+        OPEN ft_treasury_update_cursor;
+        FETCH NEXT FROM ft_treasury_update_cursor INTO @FTransactionID, @OldTotalPaid, @NewTotalPaid, @TransactionType;
         
         WHILE @@FETCH_STATUS = 0
         BEGIN
@@ -1587,11 +1691,11 @@ BEGIN
                 WHERE t.TreasuryID > @TreasuryID;
             END
             
-            FETCH NEXT FROM ft_cursor INTO @FTransactionID, @OldTotalPaid, @NewTotalPaid, @TransactionType;
+            FETCH NEXT FROM ft_treasury_update_cursor INTO @FTransactionID, @OldTotalPaid, @NewTotalPaid, @TransactionType;
         END
         
-        CLOSE ft_cursor;
-        DEALLOCATE ft_cursor;
+        CLOSE ft_treasury_update_cursor;
+        DEALLOCATE ft_treasury_update_cursor;
     END
 END;
 GO
@@ -1619,20 +1723,20 @@ BEGIN
     
     -- Update PaymentStatus for affected FinancialTransactions
     DECLARE @FTransactionID int;
-    DECLARE payment_cursor CURSOR FOR
+    DECLARE ft_payment_insert_cursor CURSOR FOR
         SELECT DISTINCT FTransactionID FROM inserted;
     
-    OPEN payment_cursor;
-    FETCH NEXT FROM payment_cursor INTO @FTransactionID;
+    OPEN ft_payment_insert_cursor;
+    FETCH NEXT FROM ft_payment_insert_cursor INTO @FTransactionID;
     
     WHILE @@FETCH_STATUS = 0
     BEGIN
         EXEC dbo.Update_FTPaymentStatus @FTransactionID = @FTransactionID;
-        FETCH NEXT FROM payment_cursor INTO @FTransactionID;
+        FETCH NEXT FROM ft_payment_insert_cursor INTO @FTransactionID;
     END
     
-    CLOSE payment_cursor;
-    DEALLOCATE payment_cursor;
+    CLOSE ft_payment_insert_cursor;
+    DEALLOCATE ft_payment_insert_cursor;
 END;
 GO
 
@@ -1659,20 +1763,20 @@ BEGIN
     
     -- Update PaymentStatus for affected FinancialTransactions
     DECLARE @FTransactionID int;
-    DECLARE payment_cursor CURSOR FOR
+    DECLARE ft_payment_delete_cursor CURSOR FOR
         SELECT DISTINCT FTransactionID FROM deleted;
     
-    OPEN payment_cursor;
-    FETCH NEXT FROM payment_cursor INTO @FTransactionID;
+    OPEN ft_payment_delete_cursor;
+    FETCH NEXT FROM ft_payment_delete_cursor INTO @FTransactionID;
     
     WHILE @@FETCH_STATUS = 0
     BEGIN
         EXEC dbo.Update_FTPaymentStatus @FTransactionID = @FTransactionID;
-        FETCH NEXT FROM payment_cursor INTO @FTransactionID;
+        FETCH NEXT FROM ft_payment_delete_cursor INTO @FTransactionID;
     END
     
-    CLOSE payment_cursor;
-    DEALLOCATE payment_cursor;
+    CLOSE ft_payment_delete_cursor;
+    DEALLOCATE ft_payment_delete_cursor;
 END;
 GO
 

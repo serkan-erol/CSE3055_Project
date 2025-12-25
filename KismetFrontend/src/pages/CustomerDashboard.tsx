@@ -35,6 +35,8 @@ const CustomerDashboard = () => {
     if (path.includes('purchase-fabric')) return 'purchase-fabric'
     if (path.includes('supply-fabric')) return 'supply-fabric'
     if (path.includes('orders')) return 'orders'
+    if (path.includes('payment-methods')) return 'payment-methods'
+    if (path.includes('bank-information')) return 'bank-information'
     if (path.includes('settings')) return 'settings'
     return ''
   }
@@ -139,6 +141,26 @@ const CustomerDashboard = () => {
               }`}
             >
               My Orders
+            </button>
+            <button
+              onClick={() => handleNavigation('payment-methods')}
+              className={`w-full text-left px-4 py-3 text-sm font-medium rounded-md transition-colors ${
+                activePage === 'payment-methods'
+                  ? 'bg-primary-100 text-primary-700 border-l-4 border-primary-600'
+                  : 'text-gray-700 hover:bg-gray-100'
+              }`}
+            >
+              Payment Methods
+            </button>
+            <button
+              onClick={() => handleNavigation('bank-information')}
+              className={`w-full text-left px-4 py-3 text-sm font-medium rounded-md transition-colors ${
+                activePage === 'bank-information'
+                  ? 'bg-primary-100 text-primary-700 border-l-4 border-primary-600'
+                  : 'text-gray-700 hover:bg-gray-100'
+              }`}
+            >
+              Bank Information
             </button>
           </nav>
         </aside>

@@ -11,14 +11,20 @@ public class SessionController : ControllerBase
 {
     private readonly ISessionRepository _sessionRepository;
     private readonly IUserRepository _userRepository;
+    private readonly ICustomerRepository _customerRepository;
+    private readonly IEmployeeRepository _employeeRepository;
     private readonly JwtHelper _jwtHelper;
 
     public SessionController(ISessionRepository sessionRepository, 
                              IUserRepository userRepository,
+                             ICustomerRepository customerRepository,
+                             IEmployeeRepository employeeRepository,
                              JwtHelper jwtHelper)
     {
         _sessionRepository = sessionRepository;
         _userRepository = userRepository;
+        _customerRepository = customerRepository;
+        _employeeRepository = employeeRepository;
         _jwtHelper = jwtHelper;
     }
 
@@ -138,8 +144,30 @@ public class SessionController : ControllerBase
                     return BadRequest(new { error = "Failed to update refresh token" });
                 }
 
-                // Generate new JWT access token
-                var newAccessToken = _jwtHelper.GenerateAccessToken(user.ContactEmail, user.UserID, user.UserType);
+                // Generate new JWT access token based on user type
+                string newAccessToken;
+                if (user.UserType == "Customer")
+                {
+                    var customer = await _customerRepository.GetByIdDtoAsync(user.UserID, cancellationToken);
+                    if (customer is null)
+                    {
+                        return BadRequest(new { error = "Customer not found" });
+                    }
+                    newAccessToken = _jwtHelper.GenerateCustomerAccessToken(user.ContactEmail, customer.CustomerID);
+                }
+                else if (user.UserType == "Employee")
+                {
+                    var employee = await _employeeRepository.GetByIdDtoAsync(user.UserID, cancellationToken);
+                    if (employee is null)
+                    {
+                        return BadRequest(new { error = "Employee not found" });
+                    }
+                    newAccessToken = _jwtHelper.GenerateEmployeeAccessToken(user.ContactEmail, employee.EmployeeID, employee.EmployeeRole, employee.AccessLevel);
+                }
+                else
+                {
+                    return BadRequest(new { error = "Invalid user type" });
+                }
                 var accessTokenExpiration = _jwtHelper.GetAccessTokenExpiration();
 
                 // Update the AccessToken
@@ -173,8 +201,30 @@ public class SessionController : ControllerBase
             // If the session exists but the AccessToken is invalid or expired, update the AccessToken
             if (session.AccessToken is null || session.ATExpiresAt < DateTimeOffset.UtcNow)
             {
-                // Generate new JWT access token
-                var newAccessToken = _jwtHelper.GenerateAccessToken(user.ContactEmail, user.UserID, user.UserType);
+                // Generate new JWT access token based on user type
+                string newAccessToken;
+                if (user.UserType == "Customer")
+                {
+                    var customer = await _customerRepository.GetByIdDtoAsync(user.UserID, cancellationToken);
+                    if (customer is null)
+                    {
+                        return BadRequest(new { error = "Customer not found" });
+                    }
+                    newAccessToken = _jwtHelper.GenerateCustomerAccessToken(user.ContactEmail, customer.CustomerID);
+                }
+                else if (user.UserType == "Employee")
+                {
+                    var employee = await _employeeRepository.GetByIdDtoAsync(user.UserID, cancellationToken);
+                    if (employee is null)
+                    {
+                        return BadRequest(new { error = "Employee not found" });
+                    }
+                    newAccessToken = _jwtHelper.GenerateEmployeeAccessToken(user.ContactEmail, employee.EmployeeID, employee.EmployeeRole, employee.AccessLevel);
+                }
+                else
+                {
+                    return BadRequest(new { error = "Invalid user type" });
+                }
                 var accessTokenExpiration = _jwtHelper.GetAccessTokenExpiration();
 
                 var updatedAccessToken = await _sessionRepository.UpdateAccessTokenAsync(
@@ -268,24 +318,62 @@ public class SessionController : ControllerBase
 
             var token = authHeader.Substring("Bearer ".Length).Trim();
             
-            // Extract userId and userType from token
+            // Extract user info from token
             var principal = _jwtHelper.GetPrincipalFromToken(token);
-            var userIdClaim = principal.FindFirst("UserId");
             var userTypeClaim = principal.FindFirst("UserType");
+            var userType = userTypeClaim?.Value ?? "Customer";
             
-            if (userIdClaim is null || !int.TryParse(userIdClaim.Value, out var userId))
+            int userId;
+            if (userType == "Customer")
             {
-                return Unauthorized(new { error = "Invalid token claims" });
+                var customerIdClaim = principal.FindFirst("CustomerID");
+                if (customerIdClaim is null || !int.TryParse(customerIdClaim.Value, out userId))
+                {
+                    return Unauthorized(new { error = "Invalid token claims - CustomerID not found" });
+                }
+            }
+            else if (userType == "Employee")
+            {
+                var employeeIdClaim = principal.FindFirst("EmployeeID");
+                if (employeeIdClaim is null || !int.TryParse(employeeIdClaim.Value, out userId))
+                {
+                    return Unauthorized(new { error = "Invalid token claims - EmployeeID not found" });
+                }
+            }
+            else
+            {
+                // Fallback to UserId for backward compatibility
+                var userIdClaim = principal.FindFirst("UserId");
+                if (userIdClaim is null || !int.TryParse(userIdClaim.Value, out userId))
+                {
+                    return Unauthorized(new { error = "Invalid token claims" });
+                }
             }
 
             // Get session to also return sessionId
             var session = await _sessionRepository.GetSessionInfoByUserIdDtoAsync(userId, cancellationToken);
             
-            return Ok(new { 
+            var response = new { 
                 userId = userId,
-                userType = userTypeClaim?.Value ?? "Customer", // Default to Customer if not found
+                userType = userType,
                 sessionId = session?.SessionID 
-            });
+            };
+
+            // Add role and accessLevel for employees
+            if (userType == "Employee")
+            {
+                var roleClaim = principal.FindFirst("Role");
+                var accessLevelClaim = principal.FindFirst("AccessLevel");
+                return Ok(new { 
+                    userId = userId,
+                    userType = userType,
+                    sessionId = session?.SessionID,
+                    role = roleClaim?.Value,
+                    accessLevel = accessLevelClaim != null && int.TryParse(accessLevelClaim.Value, out var accessLevel) ? accessLevel : (int?)null
+                });
+            }
+            
+            return Ok(response);
         }
         catch (Exception ex)
         {

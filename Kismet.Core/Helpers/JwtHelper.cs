@@ -16,7 +16,62 @@ namespace Kismet.Core.Helpers
             _config = config;
         }
 
-        // Generate a new access token with JWT
+        // Generate a new access token with JWT for Customer
+        public string GenerateCustomerAccessToken(string email, int customerId)
+        {
+            var jwtSection = _config.GetSection("Jwt");
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSection["Key"]!));
+            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+            var claims = new[]
+            {
+                new Claim(ClaimTypes.Email, email),
+                new Claim("CustomerID", customerId.ToString()),
+                new Claim("UserType", "Customer"),
+                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+            };
+
+            var token = new JwtSecurityToken(
+                issuer: jwtSection["Issuer"],
+                audience: jwtSection["Audience"],
+                claims: claims,
+                expires: GetAccessTokenExpiration().UtcDateTime,
+                signingCredentials: creds
+            );
+
+            return new JwtSecurityTokenHandler().WriteToken(token);
+        }
+
+        // Generate a new access token with JWT for Employee
+        public string GenerateEmployeeAccessToken(string email, int employeeId, string role, int accessLevel)
+        {
+            var jwtSection = _config.GetSection("Jwt");
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSection["Key"]!));
+            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+            var claims = new[]
+            {
+                new Claim(ClaimTypes.Email, email),
+                new Claim("EmployeeID", employeeId.ToString()),
+                new Claim("UserType", "Employee"),
+                new Claim("Role", role),
+                new Claim("AccessLevel", accessLevel.ToString()),
+                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+            };
+
+            var token = new JwtSecurityToken(
+                issuer: jwtSection["Issuer"],
+                audience: jwtSection["Audience"],
+                claims: claims,
+                expires: GetAccessTokenExpiration().UtcDateTime,
+                signingCredentials: creds
+            );
+
+            return new JwtSecurityTokenHandler().WriteToken(token);
+        }
+
+        // Legacy method for backward compatibility (deprecated - use specific methods instead)
+        [Obsolete("Use GenerateCustomerAccessToken or GenerateEmployeeAccessToken instead")]
         public string GenerateAccessToken(string email, int userId, string userType)
         {
             var jwtSection = _config.GetSection("Jwt");
