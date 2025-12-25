@@ -26,6 +26,7 @@ public static class DependencyInjection
         services.AddScoped<IFabricRepository, FabricRepository>();
         //aaa services.AddScoped<IUnitPriceRepository, UnitPriceRepository>();
         services.AddScoped<IBatchRepository, BatchRepository>();
+        services.AddScoped<IViewRepository, ViewRepository>();
         return services;
     }
 }
