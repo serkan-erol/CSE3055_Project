@@ -55,6 +55,12 @@ const EmployeeLogin = () => {
       if (loginResponse.sessionId) {
         sessionStorage.setItem('sessionId', loginResponse.sessionId.toString())
       }
+      if (loginResponse.accessLevel) {
+        sessionStorage.setItem('accessLevel', loginResponse.accessLevel.toString())
+      }
+      if (loginResponse.role) {
+        sessionStorage.setItem('role', loginResponse.role)
+      }
 
       // Verify user type before redirecting
       const userInfo = await sessionApi.getCurrentUser()
@@ -62,11 +68,13 @@ const EmployeeLogin = () => {
         navigate('/employee/dashboard', {
           state: { message: 'Login successful! Welcome back.' }
         })
-      } else {
-        // If somehow a customer logged in through employee login, redirect to customer dashboard
+      } else if (userInfo.userType === 'Customer') {
+        // Customer logged in through employee login - redirect to customer dashboard
         navigate('/customer/dashboard', {
           state: { message: 'Login successful! Welcome back.' }
         })
+      } else {
+        setError('Invalid user type. Please contact support.')
       }
     } catch (err: any) {
       setError(err.response?.data?.error || err.message || 'Login failed. Please check your credentials.')

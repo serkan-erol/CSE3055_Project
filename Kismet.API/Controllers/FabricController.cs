@@ -10,11 +10,15 @@ namespace Kismet.API.Controllers;
 public class FabricController : ControllerBase
 {
     private readonly IFabricRepository _fabricRepository;
+    private readonly IEmployeeRepository _employeeRepository;
     private readonly ILogger<FabricController> _logger;
 
-    public FabricController(IFabricRepository fabricRepository, ILogger<FabricController> logger)
+    private const int minAccessLevel = 5;
+
+    public FabricController(IFabricRepository fabricRepository, IEmployeeRepository employeeRepository, ILogger<FabricController> logger)
     {
         _fabricRepository = fabricRepository;
+        _employeeRepository = employeeRepository;
         _logger = logger;
     }
 
@@ -63,11 +67,24 @@ public class FabricController : ControllerBase
     /// Create new fabric
     /// </summary>
     // [Authorize(Roles = "Employee")] // Commented out - no authorization
-    [HttpPost]
-    public async Task<IActionResult> CreateFabric([FromBody] CreateFabricDto dto, CancellationToken cancellationToken)
+    [HttpPost("{employeeId:int}/create-fabric")]
+    public async Task<IActionResult> CreateFabric(int employeeId, [FromBody] CreateFabricDto dto, CancellationToken cancellationToken)
     {
         try
         {
+            // Check if the employee exists
+            var employee = await _employeeRepository.GetByIdDtoAsync(employeeId, cancellationToken);
+            if (employee is null)
+            {
+                return NotFound(new { error = "Employee not found" });
+            }
+
+            // Check if the employee's access level is at least 5
+            if (employee.AccessLevel < minAccessLevel)
+            {
+                return BadRequest(new { error = "Employee does not have permission to create fabrics" });
+            }
+
             var fabric = await _fabricRepository.CreateFabricAsync(dto, cancellationToken);
             return CreatedAtAction(nameof(GetFabricById), new { fabricId = fabric.FabricID }, fabric);
         }
@@ -103,5 +120,3 @@ public class FabricController : ControllerBase
         }
     }
 }
-
-// [Authorize] // Commented out - no authorization for this project

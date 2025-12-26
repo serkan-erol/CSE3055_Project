@@ -17,13 +17,20 @@ public class SessionRepository : ISessionRepository
 {
     private readonly IDbConnectionFactory _connectionFactory;
     private readonly IUserRepository _userRepository;
+    private readonly ICustomerRepository _customerRepository;
+    private readonly IEmployeeRepository _employeeRepository;
     private readonly JwtHelper _jwtHelper;
 
     public SessionRepository(IDbConnectionFactory connectionFactory, 
-                             IUserRepository userRepository, JwtHelper jwtHelper)
+                             IUserRepository userRepository,
+                             ICustomerRepository customerRepository,
+                             IEmployeeRepository employeeRepository,
+                             JwtHelper jwtHelper)
     {
         _connectionFactory = connectionFactory;
         _userRepository = userRepository;
+        _customerRepository = customerRepository;
+        _employeeRepository = employeeRepository;
         _jwtHelper = jwtHelper;
     }
     
@@ -104,11 +111,32 @@ public class SessionRepository : ISessionRepository
                 throw new InvalidOperationException("User not found");
             }
 
-            // Get the user type and generate the AccessToken
-            var userType = user.UserType;
+            // Generate the AccessToken based on user type
+            string accessToken;
+            if (user.UserType == "Customer")
+            {
+                var customer = await _customerRepository.GetByIdDtoAsync(dto.UserID, cancellationToken);
+                if (customer is null)
+                {
+                    throw new InvalidOperationException("Customer not found");
+                }
+                accessToken = _jwtHelper.GenerateCustomerAccessToken(dto.Email, customer.CustomerID);
+            }
+            else if (user.UserType == "Employee")
+            {
+                var employee = await _employeeRepository.GetByIdDtoAsync(dto.UserID, cancellationToken);
+                if (employee is null)
+                {
+                    throw new InvalidOperationException("Employee not found");
+                }
+                accessToken = _jwtHelper.GenerateEmployeeAccessToken(dto.Email, employee.EmployeeID, employee.EmployeeRole, employee.AccessLevel);
+            }
+            else
+            {
+                throw new InvalidOperationException("Invalid user type");
+            }
 
-            // Generate the AccessToken and RefreshToken
-            var accessToken = _jwtHelper.GenerateAccessToken(dto.Email, dto.UserID, userType);
+            // Generate the RefreshToken
             var refreshToken = _jwtHelper.GenerateRefreshToken();
 
             // Insert the session and return the session ID

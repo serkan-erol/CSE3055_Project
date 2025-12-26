@@ -44,6 +44,22 @@ public class FinancialTransactionRepository : IFinancialTransactionRepository
     }
 
     /// <summary>
+    /// Get a Customer's all FTs for employees to see
+    /// </summary>
+    public async Task<IReadOnlyList<FTResponseToEmployeeDto>> GetFTByCustomerIdForEmployeeAsync(int customerId, CancellationToken cancellationToken = default)
+    {
+        using var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken);
+
+        // Build the query dynamically based on the parameters
+        var query = SqlQueries.FinancialTransaction.GetFTBaseEmployee + " WHERE ft.CustomerID = @CustomerID ORDER BY ft.FTransactionID";
+
+        // Execute the query and return the FTs
+        var fts = await connection.QueryAsync<FTResponseToEmployeeDto>(
+            new CommandDefinition(query, new { CustomerID = customerId }, cancellationToken: cancellationToken));
+        return fts.ToList().AsReadOnly();
+    }
+
+    /// <summary>
     /// Get ALL FT for employees to see
     /// </summary>
     public async Task<IReadOnlyList<FTResponseToEmployeeDto>> GetFTForEmployeeAsync(CancellationToken cancellationToken = default)
@@ -146,13 +162,13 @@ public class FinancialTransactionRepository : IFinancialTransactionRepository
     /// <summary>
     /// Update the description of a FT
     /// </summary>
-    public async Task<FTResponseToCustomerDto> UpdateFTDescriptionAsync(int customerId, UpdateFTDescriptionDto dto, CancellationToken cancellationToken = default)
+    public async Task<FTResponseToEmployeeDto> UpdateFTDescriptionAsync(UpdateFTDescriptionDto dto, CancellationToken cancellationToken = default)
     {
         using var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken);
         
         await connection.ExecuteAsync(new CommandDefinition(SqlQueries.FinancialTransaction.UpdateFTDescription, dto, cancellationToken: cancellationToken));
 
-        var ft = await GetFTByIdForCustomerAsync(customerId, dto.FTransactionID, cancellationToken);
+        var ft = await GetFTByIdForEmployeeAsync(dto.FTransactionID, cancellationToken);
 
         // Return the updated FT
         return ft;

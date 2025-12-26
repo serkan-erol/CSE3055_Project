@@ -58,10 +58,10 @@ public class CreateEmployeeDto
 /// </summary>
 public class UpdateEmployeeRoleDto
 {
-    // Set by controller from route; not accepted from request body
-    [JsonIgnore]
+    [Required]
     public int EmployeeID { get; set; }
 
+    [Required]
     [StringLength(50)]
     public string EmployeeRole { get; set; } = string.Empty;
 
@@ -72,9 +72,10 @@ public class UpdateEmployeeRoleDto
 /// </summary>
 public class UpdateEmployeeAccessLevelDto
 {
-    // Set by controller from route; not accepted from request body
-    [JsonIgnore]
+    [Required]
     public int EmployeeID { get; set; }
 
+    [Required]
+    [Range(1, 10)]
     public int AccessLevel { get; set; }
 }

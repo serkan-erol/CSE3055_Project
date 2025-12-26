@@ -26,26 +26,6 @@ public class PaymentController : ControllerBase
     }
 
     /// <summary>
-    /// Get all payments
-    /// </summary>
-    [HttpGet("get-all-payments/")]
-    public async Task<IActionResult> GetAllPaymentsAsync(CancellationToken cancellationToken)
-    {
-        try
-        {
-            // Get all payments
-            var payments = await _paymentRepository.GetAllPaymentsAsync(cancellationToken);
-            
-            // Return the payments
-            return Ok(payments);
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(new { error = ex.Message });
-        }
-    }
-
-    /// <summary>
     /// Get a payment by ID
     /// </summary>
     [HttpGet("{paymentId:int}/get-by-payment-id/")]
@@ -68,8 +48,8 @@ public class PaymentController : ControllerBase
     /// <summary>
     /// Get all payments for a customer
     /// </summary>
-    [HttpGet("{customerId:int}/get-all-payments/for-customers")]
-    public async Task<IActionResult> GetPaymentForCustomerAsync(int customerId, CancellationToken cancellationToken)
+    [HttpGet("{customerId:int}/get-all-customer-payments")]
+    public async Task<IActionResult> GetAllCustomerPaymentsAsync(int customerId, CancellationToken cancellationToken)
     {
         try
         {
@@ -82,7 +62,7 @@ public class PaymentController : ControllerBase
             }
 
             // Get all payments for the customer
-            var payments = await _paymentRepository.GetPaymentForCustomerAsync(customerId, cancellationToken);
+            var payments = await _paymentRepository.GetAllCustomerPaymentsAsync(customerId, cancellationToken);
             
             // Return the payments
             return Ok(payments);
@@ -96,8 +76,8 @@ public class PaymentController : ControllerBase
     /// <summary>
     /// Get a payment by ID for a customer
     /// </summary>
-    [HttpGet("{customerId:int}/{paymentId:int}/get-by-payment-id/for-customers")]
-    public async Task<IActionResult> GetPaymentByIdForCustomerAsync(int customerId, int paymentId, CancellationToken cancellationToken)
+    [HttpGet("{customerId:int}/{paymentId:int}/get-customer-payment-by-id")]
+    public async Task<IActionResult> GetCustomerPaymentByIdAsync(int customerId, int paymentId, CancellationToken cancellationToken)
     {
         try
         {
@@ -109,7 +89,7 @@ public class PaymentController : ControllerBase
             }
 
             // Get the payment by ID for the customer
-            var payment = await _paymentRepository.GetPaymentByIdForCustomerAsync(customerId, paymentId, cancellationToken);
+            var payment = await _paymentRepository.GetCustomerPaymentByIdAsync(customerId, paymentId, cancellationToken);
             
             // Check if the payment exists
             if (payment is null)
@@ -130,7 +110,7 @@ public class PaymentController : ControllerBase
     /// Create a new payment
     /// </summary>
     [HttpPost("create-payment/")]
-    public async Task<IActionResult> CreatePaymentAsync(int billingId, int fTransactionId, [FromBody] CreatePaymentDto dto, CancellationToken cancellationToken)
+    public async Task<IActionResult> CreatePaymentAsync(int customerId, int fTransactionId, [FromBody] CreatePaymentDto dto, CancellationToken cancellationToken)
     {
         try
         {
@@ -140,14 +120,12 @@ public class PaymentController : ControllerBase
                 return BadRequest(ModelState);
             }
 
-            // Check if the Billing exists
-            var billing = await _billingRepository.GetBillingByIdForEmployeeAsync(billingId, cancellationToken);
-            if (billing is null)
+            // Check if the customer exists
+            var customer = await _customerRepository.GetByIdDtoAsync(customerId, cancellationToken);
+            if (customer is null)
             {
-                return NotFound(new { error = "Billing not found" });
+                return NotFound(new { error = "Customer not found" });
             }
-
-            dto.BillingID = billingId;
 
             // Check if the Financial Transaction exists
             var financialTransaction = await _financialTransactionRepository.GetFTByIdForEmployeeAsync(fTransactionId, cancellationToken);
@@ -158,8 +136,14 @@ public class PaymentController : ControllerBase
 
             dto.FTransactionID = fTransactionId;
 
+            // Check if the FT belongs to the customer
+            if (financialTransaction.CustomerID != customerId)
+            {
+                return BadRequest(new { error = "Financial transaction does not belong to the customer" });
+            }
+
             // Check if Billing, FT and Payment types are compatible
-            if (billing.BillingType != financialTransaction.TransactionType || dto.PaymentType != financialTransaction.TransactionType)
+            if (dto.PaymentType != financialTransaction.TransactionType)
             {
                 return BadRequest(new { error = "Billing, Financial transaction and Payment types are not compatible" });
             }

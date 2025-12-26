@@ -16,24 +16,6 @@ public class PaymentRepository : IPaymentRepository
         _connectionFactory = connectionFactory;
     }
 
-
-
-    /// <summary>
-    /// Get ALL Payments
-    /// </summary>
-    public async Task<IReadOnlyList<PaymentResponseDto>> GetAllPaymentsAsync(CancellationToken cancellationToken = default)
-    {
-        using var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken);
-
-        // Build the query dynamically based on the parameters
-        var query = SqlQueries.Payment.GetAllPayments + " ORDER BY p.PaymentID";
-
-        // Execute the query and return the payments
-        var payments = await connection.QueryAsync<PaymentResponseDto>(
-            new CommandDefinition(query, cancellationToken: cancellationToken));
-        return payments.ToList().AsReadOnly();
-    }
-
     /// <summary>
     /// Get a Payment by ID
     /// </summary>
@@ -53,7 +35,7 @@ public class PaymentRepository : IPaymentRepository
     /// <summary>
     /// Get all Payments for a customer
     /// </summary>
-    public async Task<IReadOnlyList<PaymentResponseDto>> GetPaymentForCustomerAsync(int customerId, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<PaymentResponseDto>> GetAllCustomerPaymentsAsync(int customerId, CancellationToken cancellationToken = default)
     {
         using var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken);
 
@@ -69,7 +51,7 @@ public class PaymentRepository : IPaymentRepository
     /// <summary>
     /// Get a Payment by ID for a customer
     /// </summary>
-    public async Task<PaymentResponseDto> GetPaymentByIdForCustomerAsync(int customerId, int paymentId, CancellationToken cancellationToken = default)
+    public async Task<PaymentResponseDto> GetCustomerPaymentByIdAsync(int customerId, int paymentId, CancellationToken cancellationToken = default)
     {
         using var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken);
 

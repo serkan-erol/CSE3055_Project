@@ -113,6 +113,95 @@ export const orderApi = {
     const response = await api.put(`/Order/${employeeId}/approve-order/`, { orderID: orderId })
     return response.data
   },
+  createOrder: async (customerId: number, data: {
+    orderType: string
+    fabricIDs: number[]
+    quantities: number[]
+    qualityGrades?: (string | null)[]
+  }) => {
+    const response = await api.post(`/Order/${customerId}/create-order`, data)
+    return response.data
+  },
+}
+
+// Fabric API functions
+export const fabricApi = {
+  getAll: async () => {
+    const response = await api.get('/Fabric')
+    return response.data
+  },
+  getById: async (fabricId: number) => {
+    const response = await api.get(`/Fabric/${fabricId}`)
+    return response.data
+  },
+}
+
+// Payment Methods (Cards) API functions
+export const paymentMethodApi = {
+  getAllByCustomerId: async (customerId: number) => {
+    const response = await api.get(`/CustomerPayment/customers/${customerId}/payment-methods`)
+    return response.data
+  },
+  getById: async (spmId: number) => {
+    const response = await api.get(`/CustomerPayment/payment-methods/${spmId}`)
+    return response.data
+  },
+  create: async (data: {
+    customerID: number
+    cardNumber: string
+    cardType: string
+    cardExpirationDate: string
+    recordExpirationDate?: string
+  }) => {
+    const response = await api.post('/CustomerPayment/payment-methods', data)
+    return response.data
+  },
+  update: async (spmId: number, data: {
+    cardNumber: string
+    cardType: string
+    cardExpirationDate: string
+    recordExpirationDate?: string
+  }) => {
+    const response = await api.put(`/CustomerPayment/payment-methods/${spmId}`, data)
+    return response.data
+  },
+  delete: async (spmId: number) => {
+    const response = await api.delete(`/CustomerPayment/payment-methods/${spmId}`)
+    return response.data
+  },
+}
+
+// Bank Information API functions
+export const bankInfoApi = {
+  getAllByCustomerId: async (customerId: number) => {
+    const response = await api.get(`/CustomerPayment/customers/${customerId}/bank-information`)
+    return response.data
+  },
+  getById: async (sbiId: number) => {
+    const response = await api.get(`/CustomerPayment/bank-information/${sbiId}`)
+    return response.data
+  },
+  create: async (data: {
+    customerID: number
+    bankName?: string
+    accountNo?: string
+    iban?: string
+  }) => {
+    const response = await api.post('/CustomerPayment/bank-information', data)
+    return response.data
+  },
+  update: async (sbiId: number, data: {
+    bankName?: string
+    accountNo?: string
+    iban?: string
+  }) => {
+    const response = await api.put(`/CustomerPayment/bank-information/${sbiId}`, data)
+    return response.data
+  },
+  delete: async (sbiId: number) => {
+    const response = await api.delete(`/CustomerPayment/bank-information/${sbiId}`)
+    return response.data
+  },
 }
 
 export default api

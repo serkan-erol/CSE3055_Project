@@ -8,17 +8,27 @@ const CustomerDashboard = () => {
   const [isLoggingOut, setIsLoggingOut] = useState(false)
   const [userId, setUserId] = useState<number | null>(null)
 
-  // Get userId from token on component mount
+  // Get userId from token on component mount and verify user type
   useEffect(() => {
     const loadCurrentUser = async () => {
       try {
         const userInfo = await sessionApi.getCurrentUser()
         if (userInfo.userId) {
-          setUserId(userInfo.userId)
-          // Also store in sessionStorage for quick access
-          sessionStorage.setItem('userId', userInfo.userId.toString())
-          if (userInfo.sessionId) {
-            sessionStorage.setItem('sessionId', userInfo.sessionId.toString())
+          // Check user type - prevent employees from accessing customer dashboard
+          if (userInfo.userType === 'Employee') {
+            // Employee trying to access customer dashboard - redirect to employee dashboard
+            navigate('/employee/dashboard')
+            return
+          } else if (userInfo.userType === 'Customer') {
+            setUserId(userInfo.userId)
+            // Also store in sessionStorage for quick access
+            sessionStorage.setItem('userId', userInfo.userId.toString())
+            if (userInfo.sessionId) {
+              sessionStorage.setItem('sessionId', userInfo.sessionId.toString())
+            }
+          } else {
+            // Invalid user type
+            navigate('/customer/login')
           }
         }
       } catch (err) {
@@ -35,6 +45,8 @@ const CustomerDashboard = () => {
     if (path.includes('purchase-fabric')) return 'purchase-fabric'
     if (path.includes('supply-fabric')) return 'supply-fabric'
     if (path.includes('orders')) return 'orders'
+    if (path.includes('payment-methods')) return 'payment-methods'
+    if (path.includes('bank-information')) return 'bank-information'
     if (path.includes('settings')) return 'settings'
     return ''
   }
@@ -56,6 +68,7 @@ const CustomerDashboard = () => {
       // Clear sessionStorage
       sessionStorage.removeItem('userId')
       sessionStorage.removeItem('sessionId')
+      sessionStorage.
       // Navigate to login page
       navigate('/customer/login', {
         state: { message: 'You have been logged out successfully.' }
@@ -65,6 +78,8 @@ const CustomerDashboard = () => {
       // Even if logout fails, clear session storage and redirect
       sessionStorage.removeItem('userId')
       sessionStorage.removeItem('sessionId')
+      sessionStorage.removeItem('paymentMethods')
+      sessionStorage.removeItem('bankInformation')
       navigate('/customer/login')
     } finally {
       setIsLoggingOut(false)
@@ -139,6 +154,26 @@ const CustomerDashboard = () => {
               }`}
             >
               My Orders
+            </button>
+            <button
+              onClick={() => handleNavigation('payment-methods')}
+              className={`w-full text-left px-4 py-3 text-sm font-medium rounded-md transition-colors ${
+                activePage === 'payment-methods'
+                  ? 'bg-primary-100 text-primary-700 border-l-4 border-primary-600'
+                  : 'text-gray-700 hover:bg-gray-100'
+              }`}
+            >
+              Payment Methods
+            </button>
+            <button
+              onClick={() => handleNavigation('bank-information')}
+              className={`w-full text-left px-4 py-3 text-sm font-medium rounded-md transition-colors ${
+                activePage === 'bank-information'
+                  ? 'bg-primary-100 text-primary-700 border-l-4 border-primary-600'
+                  : 'text-gray-700 hover:bg-gray-100'
+              }`}
+            >
+              Bank Information
             </button>
           </nav>
         </aside>

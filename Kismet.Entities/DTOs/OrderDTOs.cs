@@ -61,7 +61,17 @@ public class CreateOrderDto
     public string OrderType { get; set; } = string.Empty; // Purchase or Supply
 
     [Required]
-    public decimal TotalAmount { get; set; }
+    [MinLength(1, ErrorMessage = "At least one fabric ID must be provided")]
+    public List<int> FabricIDs { get; set; } = new();
+
+    [Required]
+    [MinLength(1, ErrorMessage = "At least one quantity must be provided")]
+    public List<int> Quantities { get; set; } = new();
+
+    public List<string?>? QualityGrades { get; set; } // Optional, can be null or shorter than FabricIDs
+
+    [JsonIgnore]
+    public decimal TotalAmount { get; set; } // Will be calculated after batches are created
 }
 
 /// <summary>

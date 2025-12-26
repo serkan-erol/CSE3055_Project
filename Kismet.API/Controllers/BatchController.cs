@@ -26,31 +26,31 @@ public class BatchController : ControllerBase
     {
         try
         {
-            // Without authorization, just return employee view with all details
-            // If you want to differentiate later, uncomment authorization
-            var batches = await _batchRepository.GetBatchesByOrderIdForEmployeeAsync(orderId, cancellationToken);
+            var batches = await _batchRepository.GetBatchesByOrderIdAsync(orderId, cancellationToken);
             return Ok(batches);
 
-            /* With authorization enabled:
-            var userType = User.FindFirst(ClaimTypes.Role)?.Value;
-
-            if (userType == "Customer")
-            {
-                var batches = await _batchRepository.GetBatchesByOrderIdForCustomerAsync(orderId, cancellationToken);
-                return Ok(batches);
-            }
-            else if (userType == "Employee")
-            {
-                var batches = await _batchRepository.GetBatchesByOrderIdForEmployeeAsync(orderId, cancellationToken);
-                return Ok(batches);
-            }
-
-            return Forbid();
-            */
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting batches for order {OrderId}", orderId);
+            return StatusCode(500, "An error occurred while retrieving batches");
+        }
+    }
+
+    /// <summary>
+    /// Get batches by ShipmentID
+    /// </summary>
+    [HttpGet("shipment/{shipmentId}")]
+    public async Task<IActionResult> GetBatchesByShipmentId(int shipmentId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var batches = await _batchRepository.GetBatchesByShipmentIdAsync(shipmentId, cancellationToken);
+            return Ok(batches);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting batches for shipment {ShipmentId}", shipmentId);
             return StatusCode(500, "An error occurred while retrieving batches");
         }
     }
@@ -99,26 +99,21 @@ public class BatchController : ControllerBase
     }
 
     /// <summary>
-    /// Create batches for an order
-    /// Batches will be automatically created with up to 20 units each
+    /// Create batches for multiple fabrics
+    /// Used by the OrderController to create batches for multiple fabrics
+    /// Therefore, no authorization is needed
     /// </summary>
-    // [Authorize(Roles = "Employee")] // Commented out - no authorization
-    [HttpPost("create")]
-    public async Task<IActionResult> CreateBatches([FromBody] CreateBatchesDto dto, CancellationToken cancellationToken)
+    [HttpPost("create-multiple-fabrics/{orderId}")]
+    public async Task<IActionResult> CreateBatchesForMultipleFabrics(int orderId, [FromBody] CreateBatchesForMultipleFabricsDto dto, CancellationToken cancellationToken)
     {
         try
         {
-            var result = await _batchRepository.CreateBatchesAsync(dto, cancellationToken);
-
-            return Ok(new
-            {
-                message = result.Message,
-                result
-            });
+            var result = await _batchRepository.CreateBatchesForMultipleFabricsAsync(orderId, dto.FabricIDs, dto.Quantities, dto.QualityGrades, cancellationToken);
+            return Ok(result);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error creating batches for order {OrderId}", dto.OrderID);
+            _logger.LogError(ex, "Error creating batches for multiple fabrics for order {OrderId}", orderId);
             return StatusCode(500, new { message = ex.Message });
         }
     }

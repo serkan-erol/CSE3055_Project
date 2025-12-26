@@ -9,6 +9,8 @@ import PurchaseFabric from './pages/customer/PurchaseFabric'
 import SupplyFabric from './pages/customer/SupplyFabric'
 import CurrentOrders from './pages/customer/CurrentOrders'
 import Settings from './pages/customer/Settings'
+import PaymentMethods from './pages/customer/PaymentMethods'
+import BankInformation from './pages/customer/BankInformation'
 import CheckOrder from './pages/employee/CheckOrder'
 
 function App() {
@@ -24,6 +26,8 @@ function App() {
           <Route path="purchase-fabric" element={<PurchaseFabric />} />
           <Route path="supply-fabric" element={<SupplyFabric />} />
           <Route path="orders" element={<CurrentOrders />} />
+          <Route path="payment-methods" element={<PaymentMethods />} />
+          <Route path="bank-information" element={<BankInformation />} />
           <Route path="settings" element={<Settings />} />
         </Route>
         <Route path="/employee/dashboard" element={<EmployeeDashboard />}>

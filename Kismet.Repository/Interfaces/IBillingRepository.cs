@@ -8,8 +8,8 @@ namespace Kismet.Repository.Interfaces;
 
 public interface IBillingRepository
 {
-    Task<IReadOnlyList<BillingResponseToCustomerDto>> GetBillingForCustomerAsync(int customerId, CancellationToken cancellationToken = default);
-    Task<IReadOnlyList<BillingResponseToEmployeeDto>> GetBillingForEmployeeAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<BillingResponseToCustomerDto>> GetBillingForCustomerAsync(int customerId, CancellationToken cancellationToken = default);    
+    Task<IReadOnlyList<BillingResponseToEmployeeDto>> GetBillingByCustomerIdForEmployeeAsync(int customerId, CancellationToken cancellationToken = default);
     Task<BillingResponseToCustomerDto> GetBillingByIdForCustomerAsync(int customerId, int billingId, CancellationToken cancellationToken = default);
     Task<BillingResponseToEmployeeDto> GetBillingByIdForEmployeeAsync(int billingId, CancellationToken cancellationToken = default);
     Task<BillingResponseToCustomerDto> CreateBillingAsync(CreateBillingDto dto, CancellationToken cancellationToken = default);

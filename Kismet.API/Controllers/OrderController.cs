@@ -14,18 +14,26 @@ public class OrderController : ControllerBase
     private readonly IEmployeeRepository _employeeRepository;
     private readonly IFinancialTransactionRepository _financialTransactionRepository;
     private readonly IBillingRepository _billingRepository;
+    private readonly IBatchRepository _batchRepository;
+    private readonly IShipmentRepository _shipmentRepository;
+
+    private const int minAccessLevel = 3;
 
     public OrderController(IOrderRepository orderRepository, 
                            ICustomerRepository customerRepository,
                            IEmployeeRepository employeeRepository,
                            IFinancialTransactionRepository financialTransactionRepository,
-                           IBillingRepository billingRepository)
+                           IBillingRepository billingRepository,
+                           IBatchRepository batchRepository,
+                           IShipmentRepository shipmentRepository)
     {
         _orderRepository = orderRepository;
         _customerRepository = customerRepository;
         _employeeRepository = employeeRepository;
         _financialTransactionRepository = financialTransactionRepository;
         _billingRepository = billingRepository;
+        _batchRepository = batchRepository;
+        _shipmentRepository = shipmentRepository;
     }
 
     /// <summary>
@@ -47,36 +55,10 @@ public class OrderController : ControllerBase
             var orders = await _orderRepository.GetOrderForCustomerAsync(customerId, cancellationToken);
             
             // Check if no orders found
-            if (orders.Count == 0)
-            {
-                return NotFound(new { error = "No orders found" });
-            }
-
-            // Return the orders
-            return Ok(orders);
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(new { error = ex.Message });
-        }
-    }
-
-    /// <summary>
-    /// Get all orders for employees to see
-    /// </summary>
-    [HttpGet("all-orders/for-employees")]
-    public async Task<IActionResult> GetAllForEmployeeAsync(CancellationToken cancellationToken)
-    {
-        try
-        {
-            // Get all orders for the employees
-            var orders = await _orderRepository.GetOrderForEmployeeAsync(cancellationToken);
-            
-            // Check if no orders found
-            if (orders.Count == 0)
-            {
-                return NotFound(new { error = "No orders found" });
-            }
+            //if (orders.Count == 0)
+            //{
+            //    return NotFound(new { error = "No orders found" });
+            //}
 
             // Return the orders
             return Ok(orders);
@@ -112,6 +94,30 @@ public class OrderController : ControllerBase
             }
 
             // Return the order
+            return Ok(order);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Get order by Order Number for a customer to see
+    /// </summary>
+    [HttpGet("{orderNumber}/order-by-order-number/for-customers")]
+    public async Task<IActionResult> GetOrderByOrderNumberForCustomerAsync(string orderNumber, CancellationToken cancellationToken)
+    {
+        try
+        {
+            // Get the order by Order Number for the customer
+            var order = await _orderRepository.GetOrderByOrderNumberForCustomerAsync(orderNumber, cancellationToken);
+            
+            // Check if order not found
+            if (order is null)
+            {
+                return NotFound(new { error = "Order not found" });
+            }
             return Ok(order);
         }
         catch (Exception ex)
@@ -179,6 +185,56 @@ public class OrderController : ControllerBase
     }
 
     /// <summary>
+    /// Get order by Order Number for employees to see
+    /// </summary>
+    [HttpGet("{orderNumber}/order-by-order-number/for-employees")]
+    public async Task<IActionResult> GetOrderByOrderNumberForEmployeeAsync(string orderNumber, CancellationToken cancellationToken)
+    {
+        try
+        {
+            // Get the order by Order Number
+            var order = await _orderRepository.GetOrderByOrderNumberForEmployeeAsync(orderNumber, cancellationToken);
+            
+            // Check if order not found
+            if (order is null)
+            {
+                return NotFound(new { error = "Order not found" });
+            }
+
+            // Return the order
+            return Ok(order);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Get order by Customer Number for employees to see
+    /// </summary>
+    [HttpGet("{customerNumber}/order-by-customer-number/for-employees")]
+    public async Task<IActionResult> GetOrderByCustomerNumberForEmployeeAsync(string customerNumber, CancellationToken cancellationToken)
+    {
+        try
+        {
+            // Get the order by Customer Number
+            var orders = await _orderRepository.GetOrderByCustomerNumberForEmployeeAsync(customerNumber, cancellationToken);
+            
+            // Check if no orders found
+            if (orders.Count == 0)
+            {
+                return NotFound(new { error = "No orders found" });
+            }
+            return Ok(orders);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    /// <summary>
     /// Create a new order for a customer
     /// </summary>
     [HttpPost("{customerId:int}/create-order")]
@@ -192,12 +248,6 @@ public class OrderController : ControllerBase
                 return BadRequest(ModelState);
             }
 
-            //aaa Check if the CustomerID in the DTO matches the CustomerID in the URL
-            //if (dto.CustomerID != customerId)
-            //{
-            //    return BadRequest(new { error = "Customer ID mismatch" });
-            //}
-
             // Check if the customer exists before creating the order
             var customer = await _customerRepository.GetByIdDtoAsync(customerId, cancellationToken);
             if (customer is null)
@@ -208,9 +258,32 @@ public class OrderController : ControllerBase
             // Set the customer ID
             dto.CustomerID = customerId;
 
-            // Create the order
+            // Validate that FabricIDs and Quantities are provided and match
+            if (dto.FabricIDs == null || dto.Quantities == null || dto.FabricIDs.Count == 0 || dto.Quantities.Count == 0)
+            {
+                return BadRequest(new { error = "FabricIDs and Quantities must be provided and cannot be empty" });
+            }
+
+            if (dto.FabricIDs.Count != dto.Quantities.Count)
+            {
+                return BadRequest(new { error = "FabricIDs and Quantities must have the same count" });
+            }
+
+            // Create the order first (with TotalAmount = 0)
             var order = await _orderRepository.CreateOrderAsync(dto, cancellationToken);
 
+            // Create batches for all fabrics
+            await _batchRepository.CreateBatchesForMultipleFabricsAsync(
+                order.OrderID, 
+                dto.FabricIDs, 
+                dto.Quantities, 
+                dto.QualityGrades, 
+                cancellationToken);
+
+            // Get the updated order to retrieve the calculated TotalAmount
+            // A trigger has updated it based on batch prices
+            var updatedOrder = await _orderRepository.GetOrderByIdForCustomerAsync(customerId, order.OrderID, cancellationToken);
+            
             // Create the associated financial transaction
             var financialTransactionDto = new CreateFTDto
             {
@@ -218,7 +291,7 @@ public class OrderController : ControllerBase
                 BillingID = 0,
                 OrderID = order.OrderID,
                 TransactionType = dto.OrderType,
-                TotalAmount = dto.TotalAmount,
+                TotalAmount = updatedOrder.TotalAmount, // Use the calculated TotalAmount from the order
                 TransactionDate = DateTime.UtcNow.Date.AddDays(-1),
             };
 
@@ -251,7 +324,7 @@ public class OrderController : ControllerBase
                 var updateBillingDto = new UpdateBillingDto
                 {
                     BillingID = suitableBillingEntry.BillingID,
-                    TotalDue = dto.TotalAmount,
+                    TotalDue = updatedOrder.TotalAmount,
                 };
                 await _billingRepository.UpdateBillingAsync(customerId, suitableBillingEntry.BillingID, updateBillingDto, cancellationToken);
             }
@@ -259,8 +332,8 @@ public class OrderController : ControllerBase
             // Create the financial transaction
             await _financialTransactionRepository.CreateFTAsync(financialTransactionDto, cancellationToken);
 
-            // Return the order
-            return Ok(order);
+            // Return the updated order (with calculated TotalAmount)
+            return Ok(updatedOrder);
         }
         catch (Exception ex)
         {
@@ -288,6 +361,13 @@ public class OrderController : ControllerBase
             {
                 return NotFound(new { error = "Employee not found" });
             }
+
+            // Check if the employee's access level is at least 3
+            if (employee.AccessLevel < minAccessLevel)
+            {
+                return BadRequest(new { error = "Employee does not have permission to update order status." });
+            }
+
             // Check if the order exists
             var order = await _orderRepository.GetOrderByIdForEmployeeAsync(dto.OrderID, cancellationToken);
             if (order is null)
@@ -345,6 +425,57 @@ public class OrderController : ControllerBase
     }
 
     /// <summary>
+    /// Cancel an order by an employee
+    /// </summary>
+    [HttpPut("{employeeId:int}/cancel-order/")]
+    public async Task<IActionResult> CancelOrderAsync(int employeeId, int orderId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            // Check if the employee exists
+            var employee = await _employeeRepository.GetByIdDtoAsync(employeeId, cancellationToken);
+            if (employee is null)
+            {
+                return NotFound(new { error = "Employee not found" });
+            }
+
+            // Check if the employee's access level is at least 3
+            if (employee.AccessLevel < minAccessLevel)
+            {
+                return BadRequest(new { error = "Employee does not have permission to cancel orders." });
+            }
+
+            // Check if the order exists
+            var order = await _orderRepository.GetOrderByIdForEmployeeAsync(orderId, cancellationToken);
+            if (order is null)
+            {
+                return NotFound(new { error = "Order not found" });
+            }
+
+            // Check if the order is already cancelled
+            if (order.OrderStatus == OrderStatus.Cancelled)
+            {
+                return BadRequest(new { error = "Order is already cancelled. It cannot be cancelled again." });
+            }
+            
+            // Update the order status to cancelled
+            var updatedOrder = await _orderRepository.UpdateOrderStatusAsync(
+                new UpdateOrderStatusDto 
+                { 
+                    OrderID = orderId, 
+                    OrderStatus = OrderStatus.Cancelled,
+                }, cancellationToken);
+
+            // Return the updated order
+            return Ok(updatedOrder);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    /// <summary>
     /// Approve an order
     /// </summary>
     [HttpPut("{employeeId:int}/approve-order/")]
@@ -363,6 +494,12 @@ public class OrderController : ControllerBase
             if (employee is null)
             {
                 return NotFound(new { error = "Employee not found" });
+            }
+
+            // Check if the employee's access level is at least 3
+            if (employee.AccessLevel < minAccessLevel)
+            {
+                return BadRequest(new { error = "Employee does not have permission to approve orders." });
             }
 
             // Check if the order exists
@@ -384,6 +521,9 @@ public class OrderController : ControllerBase
 
             // Approve the order
             var approvedOrder = await _orderRepository.ApproveOrderAsync(dto, cancellationToken);
+
+            //Create the Shipments for the order
+            await _shipmentRepository.ShipOrderAsync(new ShipOrderDto { OrderID = approvedOrder.OrderID, EmployeeID = employeeId }, cancellationToken);
 
             // Return the approved order
             return Ok(approvedOrder);
@@ -447,7 +587,6 @@ public class OrderController : ControllerBase
             return BadRequest(new { error = ex.Message });
         }
     }
-
 
     /// <summary>
     /// Check if an order is locked

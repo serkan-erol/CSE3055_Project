@@ -41,18 +41,18 @@ public class BillingRepository : IBillingRepository
     }
 
     /// <summary>
-    /// Get ALL billing for employees to see
+    /// Get all billings of a customer for an employee to see
     /// </summary>
-    public async Task<IReadOnlyList<BillingResponseToEmployeeDto>> GetBillingForEmployeeAsync(CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<BillingResponseToEmployeeDto>> GetBillingByCustomerIdForEmployeeAsync(int customerId, CancellationToken cancellationToken = default)
     {
         using var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken);
 
         // Build the query dynamically based on the parameters
-        var query = SqlQueries.Billing.GetBillingBaseEmployee + " ORDER BY b.BillingID";
+        var query = SqlQueries.Billing.GetBillingBaseEmployee + " WHERE b.CustomerID = @CustomerID ORDER BY b.BillingID";
 
         // Execute the query and return the billings
         var billings = await connection.QueryAsync<BillingResponseToEmployeeDto>(
-            new CommandDefinition(query, cancellationToken: cancellationToken));
+            new CommandDefinition(query, new { CustomerID = customerId }, cancellationToken: cancellationToken));
         return billings.ToList().AsReadOnly();
     }
 

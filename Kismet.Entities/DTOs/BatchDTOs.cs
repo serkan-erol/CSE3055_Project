@@ -5,21 +5,9 @@ namespace Kismet.Entities.DTOs;
 
 
 /// <summary>
-/// DTO for returning Batch data to customers
-/// </summary>
-public class BatchResponseToCustomerDto
-{
-    public string BatchNumber { get; set; } = string.Empty;
-    public int Quantity { get; set; }
-    public decimal BatchPrice { get; set; }
-    public DateTime? ProductionDate { get; set; }
-    public string? QualityGrade { get; set; }
-}
-
-/// <summary>
 /// DTO for returning Batch data to employees
 /// </summary>
-public class BatchResponseToEmployeeDto
+public class BatchResponseDto
 {
     public int BatchID { get; set; }
     public int OrderID { get; set; }
@@ -34,17 +22,17 @@ public class BatchResponseToEmployeeDto
 }
 
 /// <summary>
-/// DTO for creating batches (stored procedure)
+/// DTO for creating batches for multiple fabrics (stored procedure)
 /// </summary>
 /// <summary>
 /// DTO for creating batches (stored procedure)
 /// </summary>
-public class CreateBatchesDto
+public class CreateBatchesForMultipleFabricsDto
 {
     public int OrderID { get; set; }
-    public int FabricID { get; set; }
-    public int TotalFabricUnits { get; set; }
-    public string? QualityGrade { get; set; }
+    public List<int> FabricIDs { get; set; } = new();
+    public List<int> Quantities { get; set; } = new();
+    public List<string?>? QualityGrades { get; set; } = new();
 }
 
 /// <summary>

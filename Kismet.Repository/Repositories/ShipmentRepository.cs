@@ -10,10 +10,16 @@ namespace Kismet.Repository.Repositories;
 public class ShipmentRepository : IShipmentRepository
 {
     private readonly IDbConnectionFactory _connectionFactory;
+    private readonly IOrderRepository _orderRepository;
+    private readonly ICustomerRepository _customerRepository;
 
-    public ShipmentRepository(IDbConnectionFactory connectionFactory)
+    public ShipmentRepository(IDbConnectionFactory connectionFactory, 
+                              IOrderRepository orderRepository, 
+                              ICustomerRepository customerRepository)
     {
         _connectionFactory = connectionFactory;
+        _orderRepository = orderRepository;
+        _customerRepository = customerRepository;
     }
 
     /// <summary>
@@ -134,6 +140,13 @@ public class ShipmentRepository : IShipmentRepository
                 dto, 
                 cancellationToken: cancellationToken));
 
+        // Update shipment status to Delivered (2)
+        await connection.ExecuteAsync(
+            new CommandDefinition(
+                SqlQueries.Shipment.UpdateShipmentStatus, 
+                new { ShipmentID = dto.ShipmentID, ShipmentStatus = ShipmentStatus.Delivered }, 
+                cancellationToken: cancellationToken));
+
         return await GetShipmentByIdForEmployeeAsync(dto.ShipmentID, cancellationToken);
     }
 
@@ -147,22 +160,6 @@ public class ShipmentRepository : IShipmentRepository
         await connection.ExecuteAsync(
             new CommandDefinition(
                 SqlQueries.Shipment.UpdateCustomsDocRef, 
-                dto, 
-                cancellationToken: cancellationToken));
-
-        return await GetShipmentByIdForEmployeeAsync(dto.ShipmentID, cancellationToken);
-    }
-
-    /// <summary>
-    /// Lock a shipment to prevent modifications
-    /// </summary>
-    public async Task<ShipmentResponseToEmployeeDto> LockShipmentAsync(LockShipmentDto dto, CancellationToken cancellationToken = default)
-    {
-        using var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken);
-
-        await connection.ExecuteAsync(
-            new CommandDefinition(
-                SqlQueries.Shipment.LockShipment, 
                 dto, 
                 cancellationToken: cancellationToken));
 
@@ -222,5 +219,36 @@ public class ShipmentRepository : IShipmentRepository
         var batchIds = await connection.QueryAsync<int>(
             new CommandDefinition(query, new { OrderID = orderId }, cancellationToken: cancellationToken));
         return batchIds.ToList().AsReadOnly();
+    }
+
+    /// <summary>
+    /// Update shipment origin and destination country
+    /// </summary>
+    public async Task<ShipmentResponseToEmployeeDto> UpdateShipmentCountriesAsync(UpdateShipmentCountriesDto dto, CancellationToken cancellationToken = default)
+    {
+        using var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken);
+
+        if (dto.OriginCountry is not null)
+        {
+            // Update shipment origin country
+            await connection.ExecuteAsync(
+            new CommandDefinition(
+                SqlQueries.Shipment.UpdateShipmentOriginCountry, 
+                dto, 
+                cancellationToken: cancellationToken));
+        }
+
+        if (dto.DestinationCountry is not null)
+        {
+            // Update shipment destination country
+            await connection.ExecuteAsync(
+                new CommandDefinition(
+                    SqlQueries.Shipment.UpdateShipmentDestinationCountry, 
+                    dto, 
+                    cancellationToken: cancellationToken));
+        }
+
+        // Return the updated shipment
+        return await GetShipmentByIdForEmployeeAsync(dto.ShipmentID, cancellationToken);
     }
 }

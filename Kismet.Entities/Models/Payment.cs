@@ -13,13 +13,6 @@ namespace Kismet.Entities.Models {
         [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
         public int PaymentID { get; set; }
 
-        [Column("BillingID")]
-        [ForeignKey("Billing")]
-        public int BillingID { get; set; }
-
-        // Navigation property for the 1-to-M relationship with Billing
-        public Billing billing { get; set; } = null!;
-
         [Column("FTransactionID")]
         [ForeignKey("FinancialTransaction")]
         public int FTransactionID { get; set; }

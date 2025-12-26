@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Kismet.Entities.DTOs;
+using Kismet.Entities.Enums;
 using Kismet.Repository.Interfaces;
 using System.Security.Claims;
 
@@ -12,7 +13,9 @@ namespace Kismet.API.Controllers;
 public class ShipmentController : ControllerBase
 {
     private readonly IShipmentRepository _shipmentRepository;
-    private readonly ILogger<ShipmentController> _logger;
+    private readonly IOrderRepository _orderRepository;
+    private readonly ICustomerRepository _customerRepository;
+    private readonly IEmployeeRepository _employeeRepository;
 
     // Constants for error messages
     private const string ShipmentNotFoundMessage = "Shipment not found";
@@ -29,13 +32,18 @@ public class ShipmentController : ControllerBase
     private const string ShipmentLockedMessage = "Cannot update delivery date. Shipment is locked.";
     private const string ShipmentLockedStatusMessage = "Cannot update status. Shipment is locked.";
     private const string ShipmentLockedActualDeliveryMessage = "Cannot set delivery date. Shipment is locked.";
+    private const int minAccessLevel = 3;
 
     public ShipmentController(
         IShipmentRepository shipmentRepository,
-        ILogger<ShipmentController> logger)
+        IOrderRepository orderRepository,
+        ICustomerRepository customerRepository,
+        IEmployeeRepository employeeRepository)
     {
         _shipmentRepository = shipmentRepository;
-        _logger = logger;
+        _orderRepository = orderRepository;
+        _customerRepository = customerRepository;
+        _employeeRepository = employeeRepository;
     }
 
     /// <summary>
@@ -52,8 +60,7 @@ public class ShipmentController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting shipments for order {OrderId}", orderId);
-            return StatusCode(500, ErrorGettingShipmentsMessage);
+            return StatusCode(500, new { error = ex.Message });
         }
     }
 
@@ -71,38 +78,61 @@ public class ShipmentController : ControllerBase
         }
         catch (InvalidOperationException ex)
         {
-            _logger.LogWarning(ex, ShipmentNotFoundLogMessage, shipmentId);
-            return NotFound(new { message = ShipmentNotFoundMessage });
+            return NotFound(new { error = ex.Message });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting shipment {ShipmentId}", shipmentId);
-            return StatusCode(500, ErrorGettingShipmentMessage);
+            return StatusCode(500, new { error = ex.Message });
         }
     }
 
     /// <summary>
     /// Ship an order - creates shipments for all batches (employees only)
     /// </summary>
-    /// <param name="orderId">The order ID to ship</param>
+    /// <param name="employeeId">The employee ID from the route</param>
+    /// <param name="orderId">The order ID to ship, from the route</param>
     ///[Authorize(Roles = EmployeeRole)]
-    [HttpPost("ship/{orderId}")]
-    public async Task<IActionResult> ShipOrder(int orderId, CancellationToken cancellationToken)
+    [HttpPost("ship/{employeeId:int}/{orderId:int}")]
+    public async Task<IActionResult> ShipOrder(int employeeId, int orderId, CancellationToken cancellationToken)
     {
         try
         {
+            // Check if the employee exists
+            var employee = await _employeeRepository.GetByIdDtoAsync(employeeId, cancellationToken);
+            if (employee is null)
+            {
+                return NotFound(new { error = "Employee not found." });
+            }
+
+            // Check if the employee's access level is at least 3
+            if (employee.AccessLevel < minAccessLevel)
+            {
+                return BadRequest(new { error = "Employee does not have permission to ship orders." });
+            }
+
             var existingBatches = await _shipmentRepository.GetBatchIdsByOrderIdAsync(orderId, cancellationToken);
             if (!existingBatches.Any())
             {
-                return BadRequest(new { message = "No batches found for this order to ship." });
+                return BadRequest(new { error = "No batches found for this order to ship." });
             }
 
-            const int employeeId = 2;
+            // Check if the order exists
+            var order = await _orderRepository.GetOrderByIdForEmployeeAsync(orderId, cancellationToken);
+            if (order is null)
+            {
+                return NotFound(new { error = "Order not found." });
+            }
+
+            // Check if the order is approved
+            if (order.OrderStatus != OrderStatus.Approved)
+            {
+                return BadRequest(new { error = "Order is not approved. It cannot be shipped." });
+            }
 
             var dto = new ShipOrderDto
             {
-                OrderID = orderId,
-                EmployeeID = employeeId
+                EmployeeID = employeeId,
+                OrderID = orderId  
             };
 
             var shipments = await _shipmentRepository.ShipOrderAsync(dto, cancellationToken);
@@ -115,13 +145,11 @@ public class ShipmentController : ControllerBase
         }
         catch (InvalidOperationException ex)
         {
-            _logger.LogWarning(ex, "Could not ship order {OrderId}", orderId);
-            return BadRequest(new { message = ex.Message });
+            return BadRequest(new { error = ex.Message });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error shipping order {OrderId}", orderId);
-            return StatusCode(500, ErrorShippingOrderMessage);
+            return StatusCode(500, new { error = ex.Message });
         }
     }
 
@@ -131,22 +159,34 @@ public class ShipmentController : ControllerBase
     /// <param name="shipmentId">The shipment ID</param>
     /// <param name="dto">Update delivery date DTO</param>
     ///[Authorize(Roles = EmployeeRole)]
-    [HttpPatch("{shipmentId}/delivery-date")]
+    [HttpPatch("{employeeId:int}/{shipmentId}/delivery-date")]
     public async Task<IActionResult> UpdateExpectedDeliveryDate(
-        int shipmentId, 
+        int employeeId, int shipmentId, 
         [FromBody] UpdateExpectedDeliveryDateDto dto, 
         CancellationToken cancellationToken)
     {
         try
         {
+            // Check if the employee exists
+            var employee = await _employeeRepository.GetByIdDtoAsync(employeeId, cancellationToken);
+            if (employee is null)
+            {
+                return NotFound(new { error = "Employee not found." });
+            }
+
+            // Check if the employee's access level is at least 3
+            if (employee.AccessLevel < minAccessLevel)
+            {
+                return BadRequest(new { error = "Employee does not have permission to update expected delivery date." });
+            }
+
             // Check if shipment is locked
             var isLocked = await _shipmentRepository.CheckIfShipmentIsLockedAsync(shipmentId, cancellationToken);
             if (isLocked)
             {
-                return BadRequest(new { message = ShipmentLockedMessage });
+                return BadRequest(new { error = ShipmentLockedMessage });
             }
 
-            const int employeeId = 2;
             dto.ShipmentID = shipmentId;
             dto.EmployeeID = employeeId;
 
@@ -155,35 +195,47 @@ public class ShipmentController : ControllerBase
         }
         catch (InvalidOperationException ex)
         {
-            _logger.LogWarning(ex, ShipmentNotFoundLogMessage, shipmentId);
-            return NotFound(new { message = ShipmentNotFoundMessage });
+            return NotFound(new { error = ex.Message });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error updating delivery date for shipment {ShipmentId}", shipmentId);
-            return StatusCode(500, ErrorUpdatingDeliveryDateMessage);
+            return StatusCode(500, new { error = ex.Message });
         }
     }
 
     /// <summary>
     /// Update shipment status (employees only)
     /// </summary>
+    /// <param name="employeeId">The employee ID</param>
     /// <param name="shipmentId">The shipment ID</param>
     /// <param name="dto">Update status DTO</param>
     ///[Authorize(Roles = EmployeeRole)]
-    [HttpPatch("{shipmentId}/status")]
+    [HttpPatch("{employeeId:int}/{shipmentId}/status")]
     public async Task<IActionResult> UpdateShipmentStatus(
-        int shipmentId, 
+        int employeeId, int shipmentId, 
         [FromBody] UpdateShipmentStatusDto dto, 
         CancellationToken cancellationToken)
     {
         try
         {
+            // Check if the employee exists
+            var employee = await _employeeRepository.GetByIdDtoAsync(employeeId, cancellationToken);
+            if (employee is null)
+            {
+                return NotFound(new { error = "Employee not found." });
+            }
+
+            // Check if the employee's access level is at least 3
+            if (employee.AccessLevel < minAccessLevel)
+            {
+                return BadRequest(new { error = "Employee does not have permission to update shipment status." });
+            }
+
             // Check if shipment is locked
             var isLocked = await _shipmentRepository.CheckIfShipmentIsLockedAsync(shipmentId, cancellationToken);
             if (isLocked)
             {
-                return BadRequest(new { message = ShipmentLockedStatusMessage });
+                return BadRequest(new { error = ShipmentLockedStatusMessage });
             }
 
             dto.ShipmentID = shipmentId;
@@ -193,35 +245,49 @@ public class ShipmentController : ControllerBase
         }
         catch (InvalidOperationException ex)
         {
-            _logger.LogWarning(ex, ShipmentNotFoundLogMessage, shipmentId);
-            return NotFound(new { message = ShipmentNotFoundMessage });
+            return NotFound(new { error = ex.Message });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error updating status for shipment {ShipmentId}", shipmentId);
-            return StatusCode(500, ErrorUpdatingShipmentStatusMessage);
+            return StatusCode(500, new { error = ex.Message });
         }
     }
 
     /// <summary>
     /// Set actual delivery date (employees only)
+    /// This method will also update the shipment status to Delivered (2)
     /// </summary>
+    /// <param name="employeeId">The employee ID</param>
     /// <param name="shipmentId">The shipment ID</param>
     /// <param name="dto">Set delivery date DTO</param>
     ///[Authorize(Roles = EmployeeRole)]
-    [HttpPatch("{shipmentId}/actual-delivery")]
+    [HttpPatch("{employeeId:int}/{shipmentId}/actual-delivery")]
     public async Task<IActionResult> SetActualDeliveryDate(
-        int shipmentId, 
+        int employeeId, int shipmentId, 
         [FromBody] SetActualDeliveryDateDto dto, 
         CancellationToken cancellationToken)
     {
         try
         {
+
+            // Check if the employee exists
+            var employee = await _employeeRepository.GetByIdDtoAsync(employeeId, cancellationToken);
+            if (employee is null)
+            {
+                return NotFound(new { error = "Employee not found." });
+            }
+
+            // Check if the employee's access level is at least 3
+            if (employee.AccessLevel < minAccessLevel)
+            {
+                return BadRequest(new { error = "Employee does not have permission to set actual delivery date." });
+            }
+
             // Check if shipment is locked
             var isLocked = await _shipmentRepository.CheckIfShipmentIsLockedAsync(shipmentId, cancellationToken);
             if (isLocked)
             {
-                return BadRequest(new { message = ShipmentLockedActualDeliveryMessage });
+                return BadRequest(new { error = ShipmentLockedActualDeliveryMessage });
             }
 
             dto.ShipmentID = shipmentId;
@@ -241,30 +307,42 @@ public class ShipmentController : ControllerBase
         }
         catch (InvalidOperationException ex)
         {
-            _logger.LogWarning(ex, ShipmentNotFoundLogMessage, shipmentId);
-            return NotFound(new { message = ShipmentNotFoundMessage });
+            return NotFound(new { error = ex.Message });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error setting actual delivery date for shipment {ShipmentId}", shipmentId);
-            return StatusCode(500, ErrorSettingActualDeliveryMessage);
+            return StatusCode(500, new { error = ex.Message });
         }
     }
 
     /// <summary>
     /// Update customs document reference (employees only)
     /// </summary>
+    /// <param name="employeeId">The employee ID</param>
     /// <param name="shipmentId">The shipment ID</param>
     /// <param name="dto">Update customs doc DTO</param>
     ///[Authorize(Roles = EmployeeRole)]
-    [HttpPatch("{shipmentId}/customs")]
+    [HttpPatch("{employeeId:int}/{shipmentId}/customs")]
     public async Task<IActionResult> UpdateCustomsDocRef(
-        int shipmentId, 
+        int employeeId, int shipmentId, 
         [FromBody] UpdateCustomsDocRefDto dto, 
         CancellationToken cancellationToken)
     {
         try
         {
+            // Check if the employee exists
+            var employee = await _employeeRepository.GetByIdDtoAsync(employeeId, cancellationToken);
+            if (employee is null)
+            {
+                return NotFound(new { error = "Employee not found." });
+            }
+
+            // Check if the employee's access level is at least 3
+            if (employee.AccessLevel < minAccessLevel)
+            {
+                return BadRequest(new { error = "Employee does not have permission to update customs document reference." });
+            }
+
             dto.ShipmentID = shipmentId;
 
             var shipment = await _shipmentRepository.UpdateCustomsDocRefAsync(dto, cancellationToken);
@@ -272,39 +350,11 @@ public class ShipmentController : ControllerBase
         }
         catch (InvalidOperationException ex)
         {
-            _logger.LogWarning(ex, ShipmentNotFoundLogMessage, shipmentId);
-            return NotFound(new { message = ShipmentNotFoundMessage });
+            return NotFound(new { error = ex.Message });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error updating customs doc for shipment {ShipmentId}", shipmentId);
-            return StatusCode(500, ErrorUpdatingCustomsDocMessage);
-        }
-    }
-
-    /// <summary>
-    /// Lock a shipment (employees only)
-    /// </summary>
-    /// <param name="shipmentId">The shipment ID</param>
-    ///[Authorize(Roles = EmployeeRole)]
-    [HttpPost("{shipmentId}/lock")]
-    public async Task<IActionResult> LockShipment(int shipmentId, CancellationToken cancellationToken)
-    {
-        try
-        {
-            var dto = new LockShipmentDto { ShipmentID = shipmentId };
-            var shipment = await _shipmentRepository.LockShipmentAsync(dto, cancellationToken);
-            return Ok(new { message = "Shipment locked successfully", shipment });
-        }
-        catch (InvalidOperationException ex)
-        {
-            _logger.LogWarning(ex, ShipmentNotFoundLogMessage, shipmentId);
-            return NotFound(new { message = ShipmentNotFoundMessage });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error locking shipment {ShipmentId}", shipmentId);
-            return StatusCode(500, ErrorLockingShipmentMessage);
+            return StatusCode(500, new { error = ex.Message });
         }
     }
 
@@ -323,8 +373,79 @@ public class ShipmentController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting status display name for shipment {ShipmentId}", shipmentId);
-            return StatusCode(500, ErrorRetrievingStatusMessage);
+            return StatusCode(500, new { error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Update shipment origin and destination country (employees only)
+    /// </summary>
+    /// <param name="employeeId">The employee ID</param>
+    /// <param name="shipmentId">The shipment ID</param>
+    /// <param name="dto">Update countries DTO</param>
+    ///[Authorize(Roles = EmployeeRole)]
+    [HttpPatch("{employeeId:int}/{shipmentId}/countries")]
+    public async Task<IActionResult> UpdateShipmentCountries(int employeeId, int shipmentId, [FromBody] UpdateShipmentCountriesDto dto, CancellationToken cancellationToken)
+    {
+        try
+        {
+            // Check if the employee exists
+            var employee = await _employeeRepository.GetByIdDtoAsync(employeeId, cancellationToken);
+            if (employee is null)
+            {
+                return NotFound(new { error = "Employee not found." });
+            }
+
+            // Check if the employee's access level is at least 3
+            if (employee.AccessLevel < minAccessLevel)
+            {
+                return BadRequest(new { error = "Employee does not have permission to update shipment origin and destination country." });
+            }
+
+            var shipment = await _shipmentRepository.GetShipmentByIdForEmployeeAsync(shipmentId, cancellationToken);
+            
+            // Check if the Shipment exists
+            if(shipment is null)
+            {
+                return NotFound(new { error = "Shipment not found" });
+            }
+            
+            dto.ShipmentID = shipmentId;
+
+            // Check if the Order exists
+            var order = await _orderRepository.GetOrderByIdForEmployeeAsync(shipment.OrderID, cancellationToken);
+            if(order is null)
+            {
+                return NotFound(new { error = "Order not found" });
+            }
+
+            dto.OrderType = order.OrderType;
+
+            // Check if the Customer exists
+            var customer = await _customerRepository.GetByIdDtoAsync(order.CustomerID, cancellationToken);
+            if(customer is null)
+            {
+                return NotFound(new { error = "Customer not found" });
+            }
+
+            if (order.OrderType == "Purchase")
+            {
+                dto.OriginCountry = "Türkiye";
+                dto.DestinationCountry = customer.Country;
+            }
+            else
+            {
+                dto.OriginCountry = customer.Country;
+                dto.DestinationCountry = "Türkiye";
+            }
+
+            // Update the shipment origin and destination country
+            var updatedShipment = await _shipmentRepository.UpdateShipmentCountriesAsync(dto, cancellationToken);
+            return Ok(updatedShipment);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { error = ex.Message });
         }
     }
 }
