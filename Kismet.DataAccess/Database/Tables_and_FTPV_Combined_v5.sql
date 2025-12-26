@@ -214,8 +214,6 @@ CREATE TABLE dbo.[Payment] (
     PaymentMethod    nvarchar(50) NULL,     -- Cash, credit card, debit card etc.
     ReferenceNumber  nvarchar(100) NULL,    -- We can use a function and a trigger to generate a reference number within set parameters
 
-    CONSTRAINT FK_Payment_Billing
-        FOREIGN KEY (BillingID) REFERENCES dbo.[Billing](BillingID),
     CONSTRAINT FK_Payment_Transaction
         FOREIGN KEY (FTransactionID) REFERENCES dbo.[FinancialTransaction](FTransactionID)
 );
