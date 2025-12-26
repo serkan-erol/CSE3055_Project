@@ -12,8 +12,25 @@ const CustomerLogin = () => {
   const navigate = useNavigate()
   const location = useLocation()
 
-  // Check for success message from registration
+  // Check if user is already logged in
   useEffect(() => {
+    const checkLoginStatus = async () => {
+      try {
+        const userInfo = await sessionApi.getCurrentUser()
+        if (userInfo.userId && userInfo.userType === 'Customer') {
+          // If customer is logged in, redirect to customer dashboard
+          navigate('/customer/dashboard')
+        } else if (userInfo.userId && userInfo.userType === 'Employee') {
+          // If employee is logged in, redirect to employee dashboard
+          navigate('/employee/dashboard')
+        }
+      } catch (error) {
+        // Not logged in, continue to login page
+      }
+    }
+    checkLoginStatus()
+
+    // Check for success message from registration
     if (location.state?.message) {
       // Show success message temporarily (you could use a toast notification here)
       const timer = setTimeout(() => {
@@ -21,7 +38,7 @@ const CustomerLogin = () => {
       }, 5000)
       return () => clearTimeout(timer)
     }
-  }, [location.state])
+  }, [navigate, location])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -44,11 +61,24 @@ const CustomerLogin = () => {
         sessionStorage.setItem('sessionId', loginResponse.sessionId.toString())
       }
 
-      // Tokens are now stored in HTTP-only cookies by the backend
-      // Login successful - navigate to customer dashboard
-      navigate('/customer/dashboard', { 
-        state: { message: 'Login successful! Welcome back.' }
-      })
+      // Verify user type before redirecting - prevent employees from accessing customer dashboard
+      const userInfo = await sessionApi.getCurrentUser()
+      if (userInfo.userType === 'Employee') {
+        // Employee tried to login via customer login - redirect to employee dashboard
+        // Note: Backend session is still valid, so they'll be auto-redirected from employee login page
+        navigate('/employee/dashboard', {
+          state: { message: 'You have been redirected to the employee dashboard.' }
+        })
+        return
+      } else if (userInfo.userType === 'Customer') {
+        // Tokens are now stored in HTTP-only cookies by the backend
+        // Login successful - navigate to customer dashboard
+        navigate('/customer/dashboard', { 
+          state: { message: 'Login successful! Welcome back.' }
+        })
+      } else {
+        setError('Invalid user type. Please contact support.')
+      }
     } catch (err: any) {
       // Handle API errors
       const errorMessage = err.response?.data?.error || err.message || 'Login failed. Please check your credentials.'

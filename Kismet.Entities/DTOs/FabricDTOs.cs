@@ -46,6 +46,7 @@ public class CreateFabricDto
 public class UpdateFabricStockDto
 {
     [Required]
+    [JsonIgnore]
     public int FabricID { get; set; }
 
     [Required]

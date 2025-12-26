@@ -55,13 +55,20 @@ public class BillingController : ControllerBase
     /// <summary>
     /// Get all billings for employees to see
     /// </summary>
-    [HttpGet("all-billings/for-employees")]
-    public async Task<IActionResult> GetBillingForEmployeeAsync(CancellationToken cancellationToken)
+    [HttpGet("{customerId:int}/all-billings/for-employees")]
+    public async Task<IActionResult> GetBillingByCustomerIdForEmployeeAsync(int customerId, CancellationToken cancellationToken)
     {
         try
         {
-            // Get all billings for the employees
-            var billings = await _billingRepository.GetBillingForEmployeeAsync(cancellationToken);
+            // Check if the customer exists
+            var customer = await _customerRepository.GetByIdDtoAsync(customerId, cancellationToken);
+            if (customer is null)
+            {
+                return NotFound(new { error = "Customer not found" });
+            }
+
+            // Get all billings for the customer
+            var billings = await _billingRepository.GetBillingByCustomerIdForEmployeeAsync(customerId, cancellationToken);
             
             // Check if no billings found
             if (billings.Count == 0)

@@ -65,6 +65,18 @@ public class CustomerRepository : ICustomerRepository
     }
 
     /// <summary>
+    /// Get customer by CustomerNumber as DTO
+    /// </summary>
+    public async Task<CustomerResponseDto?> GetByCustomerNumberAsync(string customerNumber, CancellationToken cancellationToken = default)
+    {
+        using var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken);
+        return await connection.QueryFirstOrDefaultAsync<CustomerResponseDto>(
+            // Build the query dynamically based on the parameters
+            new CommandDefinition(SqlQueries.Customer.GetCustomerBase + " WHERE c.CustomerNumber = @CustomerNumber", 
+                new { CustomerNumber = customerNumber }, cancellationToken: cancellationToken));
+    }
+
+    /// <summary>
     /// Create a new customer
     /// </summary>
     public async Task<CustomerResponseDto> CreateAsync(CreateCustomerDto dto, CancellationToken cancellationToken = default)

@@ -10,7 +10,6 @@ namespace Kismet.Entities.DTOs;
 public class PaymentResponseDto
 {
     public int PaymentID { get; set; }
-    public int BillingID { get; set; }
     public int FTransactionID { get; set; }
     public decimal PaymentAmount { get; set; }
     public string PaymentType { get; set; } = string.Empty;
@@ -24,10 +23,6 @@ public class PaymentResponseDto
 /// </summary>
 public class CreatePaymentDto
 {
-    [Required]
-    [JsonIgnore]
-    public int BillingID { get; set; }
-
     [Required]
     [JsonIgnore]
     public int FTransactionID { get; set; }

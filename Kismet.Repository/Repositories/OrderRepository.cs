@@ -37,22 +37,6 @@ public class OrderRepository : IOrderRepository
     }
 
     /// <summary>
-    /// Get ALL orders for employees to see
-    /// </summary>
-    public async Task<IReadOnlyList<OrderResponseToEmployeeDto>> GetOrderForEmployeeAsync(CancellationToken cancellationToken = default)
-    {
-        using var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken);
-
-        // Build the query dynamically based on the parameters
-        var query = SqlQueries.Order.GetOrderBaseForEmployee + " ORDER BY o.OrderID";
-
-        // Execute the query and return the orders
-        var orders = await connection.QueryAsync<OrderResponseToEmployeeDto>(
-            new CommandDefinition(query, cancellationToken: cancellationToken));
-        return orders.ToList().AsReadOnly();
-    }
-
-    /// <summary>
     /// Get an order by ID for a customer to see
     /// </summary>
     public async Task<OrderResponseToCustomerDto> GetOrderByIdForCustomerAsync(int customerId, int orderId, CancellationToken cancellationToken = default)
@@ -66,6 +50,16 @@ public class OrderRepository : IOrderRepository
         var order = await connection.QuerySingleOrDefaultAsync<OrderResponseToCustomerDto>(
             new CommandDefinition(query, new { OrderID = orderId, CustomerID = customerId }, cancellationToken: cancellationToken));
         return order ?? throw new InvalidOperationException("Order not found");
+    }
+
+    /// <summary>
+    /// Get an order by Order Number for a customer to see
+    /// </summary>
+    public async Task<OrderResponseToCustomerDto?> GetOrderByOrderNumberForCustomerAsync(string orderNumber, CancellationToken cancellationToken = default)
+    {
+        using var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken);
+        return await connection.QuerySingleOrDefaultAsync<OrderResponseToCustomerDto>(
+            new CommandDefinition(SqlQueries.Order.GetOrderBaseForCustomer + " WHERE o.OrderNumber = @OrderNumber", new { OrderNumber = orderNumber }, cancellationToken: cancellationToken));
     }
 
     /// <summary>
@@ -99,7 +93,33 @@ public class OrderRepository : IOrderRepository
             new CommandDefinition(query, new { CustomerID = customerId }, cancellationToken: cancellationToken));
         return orders.ToList().AsReadOnly();
     }
-    
+
+    /// <summary>
+    /// Get an order by Order Number for an employee to see
+    /// </summary>
+    public async Task<OrderResponseToEmployeeDto?> GetOrderByOrderNumberForEmployeeAsync(string orderNumber, CancellationToken cancellationToken = default)
+    {
+        using var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken);
+        return await connection.QuerySingleOrDefaultAsync<OrderResponseToEmployeeDto>(
+            new CommandDefinition(SqlQueries.Order.GetOrderBaseForEmployee + " WHERE o.OrderNumber = @OrderNumber", new { OrderNumber = orderNumber }, cancellationToken: cancellationToken));
+    }
+
+    /// <summary>
+    /// Get all orders by Customer Number for an employee to see
+    /// </summary>
+    public async Task<IReadOnlyList<OrderResponseToEmployeeDto>> GetOrderByCustomerNumberForEmployeeAsync(string customerNumber, CancellationToken cancellationToken = default)
+    {
+        using var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken);
+
+        // Build the query dynamically based on the parameters
+        var query = SqlQueries.Order.GetOrderBaseForEmployee + " WHERE c.CustomerNumber = @CustomerNumber ORDER BY o.OrderID";
+
+        // Execute the query and return the orders
+        var orders = await connection.QueryAsync<OrderResponseToEmployeeDto>(
+            new CommandDefinition(query, new { CustomerNumber = customerNumber }, cancellationToken: cancellationToken));
+        return orders.ToList().AsReadOnly();
+    }
+
     /// <summary>
     /// Create a new order for a customer (without batches - batches are created separately)
     /// </summary>
@@ -135,6 +155,21 @@ public class OrderRepository : IOrderRepository
         
         // Return the updated order using the employee DTO
         return await GetOrderByIdForEmployeeAsync(dto.OrderID, cancellationToken);
+    }
+
+    /// <summary>
+    /// Cancel an order (only employees can cancel orders)
+    /// </summary>
+    public async Task<OrderResponseToEmployeeDto> CancelOrderAsync(int orderId, CancellationToken cancellationToken = default)
+    {
+        using var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken);
+
+        // Cancel the order
+        await connection.ExecuteAsync(
+            new CommandDefinition(SqlQueries.Order.CancelOrder, new { OrderID = orderId }, cancellationToken: cancellationToken));
+        
+        // Return the cancelled order
+        return await GetOrderByIdForEmployeeAsync(orderId, cancellationToken);
     }
 
     /// <summary>

@@ -62,6 +62,18 @@ public class EmployeeRepository : IEmployeeRepository
                 new { ContactEmail = email }, 
                 cancellationToken: cancellationToken));
     }
+
+    /// <summary>
+    /// Get employee by EmployeeNumber as DTO
+    /// </summary>
+    public async Task<EmployeeResponseDto?> GetByEmployeeNumberAsync(string employeeNumber, CancellationToken cancellationToken = default)
+    {
+        using var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken);
+        return await connection.QueryFirstOrDefaultAsync<EmployeeResponseDto>(
+            // Build the query dynamically based on the parameters
+            new CommandDefinition(SqlQueries.Employee.GetEmployeeBase + " WHERE e.EmployeeNumber = @EmployeeNumber", 
+                new { EmployeeNumber = employeeNumber }, cancellationToken: cancellationToken));
+    }
     
     /// <summary>
     /// Create a new employee

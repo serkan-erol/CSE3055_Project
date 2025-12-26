@@ -85,6 +85,15 @@ public class SessionController : ControllerBase
                 return NotFound(new { error = "User not found" });
             }
 
+            // Check if User's password is hashed in the DB or not
+            // This adds support for adding new users to the DB directly with inserts in SQL code
+            if (!user.PasswordHash.StartsWith("$2a$"))
+            {
+                // The password is not hashed, so we need to hash it
+                var passwordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password);
+                user.PasswordHash = passwordHash;
+            }
+
             // Verify the password
             var isPasswordValid = BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash);
             if (!isPasswordValid)

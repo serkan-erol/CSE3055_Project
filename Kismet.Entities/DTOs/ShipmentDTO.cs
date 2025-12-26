@@ -45,11 +45,12 @@ public class ShipmentResponseToEmployeeDto
 public class ShipOrderDto
 {
     [Required]
-    public int OrderID { get; set; }
+    [JsonIgnore]
+    public int EmployeeID { get; set; }
 
     [Required]
     [JsonIgnore]
-    public int EmployeeID { get; set; }
+    public int OrderID { get; set; }
 }
 
 /// <summary>
@@ -68,6 +69,7 @@ public class ShipOrderResponseDto
 public class UpdateExpectedDeliveryDateDto
 {
     [Required]
+    [JsonIgnore]
     public int ShipmentID { get; set; }
 
     [Required]
@@ -84,6 +86,7 @@ public class UpdateExpectedDeliveryDateDto
 public class UpdateShipmentStatusDto
 {
     [Required]
+    [JsonIgnore]
     public int ShipmentID { get; set; }
 
     [Required]
@@ -97,6 +100,7 @@ public class UpdateShipmentStatusDto
 public class SetActualDeliveryDateDto
 {
     [Required]
+    [JsonIgnore]
     public int ShipmentID { get; set; }
 
     [Required]
@@ -109,6 +113,7 @@ public class SetActualDeliveryDateDto
 public class UpdateCustomsDocRefDto
 {
     [Required]
+    [JsonIgnore]
     public int ShipmentID { get; set; }
 
     [Required]
@@ -116,10 +121,18 @@ public class UpdateCustomsDocRefDto
 }
 
 /// <summary>
-/// DTO for locking shipment
+/// DTO for updating shipment origin and destination country
 /// </summary>
-public class LockShipmentDto
+public class UpdateShipmentCountriesDto
 {
     [Required]
+    [JsonIgnore]
     public int ShipmentID { get; set; }
+
+    [Required]
+    public string OrderType { get; set; } = string.Empty;
+
+    public string? OriginCountry { get; set; }
+
+    public string? DestinationCountry { get; set; }
 }

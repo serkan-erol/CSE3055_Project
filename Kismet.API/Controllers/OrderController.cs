@@ -17,6 +17,8 @@ public class OrderController : ControllerBase
     private readonly IBatchRepository _batchRepository;
     private readonly IShipmentRepository _shipmentRepository;
 
+    private const int minAccessLevel = 3;
+
     public OrderController(IOrderRepository orderRepository, 
                            ICustomerRepository customerRepository,
                            IEmployeeRepository employeeRepository,
@@ -53,36 +55,10 @@ public class OrderController : ControllerBase
             var orders = await _orderRepository.GetOrderForCustomerAsync(customerId, cancellationToken);
             
             // Check if no orders found
-            if (orders.Count == 0)
-            {
-                return NotFound(new { error = "No orders found" });
-            }
-
-            // Return the orders
-            return Ok(orders);
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(new { error = ex.Message });
-        }
-    }
-
-    /// <summary>
-    /// Get all orders for employees to see
-    /// </summary>
-    [HttpGet("all-orders/for-employees")]
-    public async Task<IActionResult> GetAllForEmployeeAsync(CancellationToken cancellationToken)
-    {
-        try
-        {
-            // Get all orders for the employees
-            var orders = await _orderRepository.GetOrderForEmployeeAsync(cancellationToken);
-            
-            // Check if no orders found
-            if (orders.Count == 0)
-            {
-                return NotFound(new { error = "No orders found" });
-            }
+            //if (orders.Count == 0)
+            //{
+            //    return NotFound(new { error = "No orders found" });
+            //}
 
             // Return the orders
             return Ok(orders);
@@ -118,6 +94,30 @@ public class OrderController : ControllerBase
             }
 
             // Return the order
+            return Ok(order);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Get order by Order Number for a customer to see
+    /// </summary>
+    [HttpGet("{orderNumber}/order-by-order-number/for-customers")]
+    public async Task<IActionResult> GetOrderByOrderNumberForCustomerAsync(string orderNumber, CancellationToken cancellationToken)
+    {
+        try
+        {
+            // Get the order by Order Number for the customer
+            var order = await _orderRepository.GetOrderByOrderNumberForCustomerAsync(orderNumber, cancellationToken);
+            
+            // Check if order not found
+            if (order is null)
+            {
+                return NotFound(new { error = "Order not found" });
+            }
             return Ok(order);
         }
         catch (Exception ex)
@@ -176,6 +176,56 @@ public class OrderController : ControllerBase
                 return NotFound(new { error = "No orders found" });
             }
 
+            return Ok(orders);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Get order by Order Number for employees to see
+    /// </summary>
+    [HttpGet("{orderNumber}/order-by-order-number/for-employees")]
+    public async Task<IActionResult> GetOrderByOrderNumberForEmployeeAsync(string orderNumber, CancellationToken cancellationToken)
+    {
+        try
+        {
+            // Get the order by Order Number
+            var order = await _orderRepository.GetOrderByOrderNumberForEmployeeAsync(orderNumber, cancellationToken);
+            
+            // Check if order not found
+            if (order is null)
+            {
+                return NotFound(new { error = "Order not found" });
+            }
+
+            // Return the order
+            return Ok(order);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Get order by Customer Number for employees to see
+    /// </summary>
+    [HttpGet("{customerNumber}/order-by-customer-number/for-employees")]
+    public async Task<IActionResult> GetOrderByCustomerNumberForEmployeeAsync(string customerNumber, CancellationToken cancellationToken)
+    {
+        try
+        {
+            // Get the order by Customer Number
+            var orders = await _orderRepository.GetOrderByCustomerNumberForEmployeeAsync(customerNumber, cancellationToken);
+            
+            // Check if no orders found
+            if (orders.Count == 0)
+            {
+                return NotFound(new { error = "No orders found" });
+            }
             return Ok(orders);
         }
         catch (Exception ex)
@@ -311,6 +361,13 @@ public class OrderController : ControllerBase
             {
                 return NotFound(new { error = "Employee not found" });
             }
+
+            // Check if the employee's access level is at least 3
+            if (employee.AccessLevel < minAccessLevel)
+            {
+                return BadRequest(new { error = "Employee does not have permission to update order status." });
+            }
+
             // Check if the order exists
             var order = await _orderRepository.GetOrderByIdForEmployeeAsync(dto.OrderID, cancellationToken);
             if (order is null)
@@ -368,6 +425,57 @@ public class OrderController : ControllerBase
     }
 
     /// <summary>
+    /// Cancel an order by an employee
+    /// </summary>
+    [HttpPut("{employeeId:int}/cancel-order/")]
+    public async Task<IActionResult> CancelOrderAsync(int employeeId, int orderId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            // Check if the employee exists
+            var employee = await _employeeRepository.GetByIdDtoAsync(employeeId, cancellationToken);
+            if (employee is null)
+            {
+                return NotFound(new { error = "Employee not found" });
+            }
+
+            // Check if the employee's access level is at least 3
+            if (employee.AccessLevel < minAccessLevel)
+            {
+                return BadRequest(new { error = "Employee does not have permission to cancel orders." });
+            }
+
+            // Check if the order exists
+            var order = await _orderRepository.GetOrderByIdForEmployeeAsync(orderId, cancellationToken);
+            if (order is null)
+            {
+                return NotFound(new { error = "Order not found" });
+            }
+
+            // Check if the order is already cancelled
+            if (order.OrderStatus == OrderStatus.Cancelled)
+            {
+                return BadRequest(new { error = "Order is already cancelled. It cannot be cancelled again." });
+            }
+            
+            // Update the order status to cancelled
+            var updatedOrder = await _orderRepository.UpdateOrderStatusAsync(
+                new UpdateOrderStatusDto 
+                { 
+                    OrderID = orderId, 
+                    OrderStatus = OrderStatus.Cancelled,
+                }, cancellationToken);
+
+            // Return the updated order
+            return Ok(updatedOrder);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    /// <summary>
     /// Approve an order
     /// </summary>
     [HttpPut("{employeeId:int}/approve-order/")]
@@ -386,6 +494,12 @@ public class OrderController : ControllerBase
             if (employee is null)
             {
                 return NotFound(new { error = "Employee not found" });
+            }
+
+            // Check if the employee's access level is at least 3
+            if (employee.AccessLevel < minAccessLevel)
+            {
+                return BadRequest(new { error = "Employee does not have permission to approve orders." });
             }
 
             // Check if the order exists
@@ -473,7 +587,6 @@ public class OrderController : ControllerBase
             return BadRequest(new { error = ex.Message });
         }
     }
-
 
     /// <summary>
     /// Check if an order is locked

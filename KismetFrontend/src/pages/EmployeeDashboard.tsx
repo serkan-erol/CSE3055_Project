@@ -10,20 +10,40 @@ const EmployeeDashboard = () => {
   //aaa Will be implemented later to decide/limit an employees acces to certain api-endpoints
   const [accessLevel, setAccessLevel] = useState<number | null>(null)
 
-  // Get userId from token on component mount
+  // Get userId from token on component mount and verify user type
   useEffect(() => {
     const loadCurrentUser = async () => {
       try {
         const userInfo = await sessionApi.getCurrentUser()
         if (userInfo.userId) {
-          setUserId(userInfo.userId)
-          // Also store in sessionStorage for quick access
-          sessionStorage.setItem('userId', userInfo.userId.toString())
-          if (userInfo.sessionId) {
-            sessionStorage.setItem('sessionId', userInfo.sessionId.toString())
+          // Check user type - redirect customers to customer dashboard
+          if (userInfo.userType === 'Customer') {
+            // Customer trying to access employee dashboard - redirect to customer dashboard
+            navigate('/customer/dashboard')
+            return
+          } else if (userInfo.userType === 'Employee') {
+            setUserId(userInfo.userId)
+            // Also store in sessionStorage for quick access
+            sessionStorage.setItem('userId', userInfo.userId.toString())
+            if (userInfo.sessionId) {
+              sessionStorage.setItem('sessionId', userInfo.sessionId.toString())
+            }
+            // Store access level if available
+            if (userInfo.accessLevel !== undefined) {
+              setAccessLevel(userInfo.accessLevel)
+            }
+            if (userInfo.role) {
+              sessionStorage.setItem('role', userInfo.role)
+            }
+            if (userInfo.accessLevel) {
+              sessionStorage.setItem('accessLevel', userInfo.accessLevel.toString())
+            }
+            // TODO: Fetch access level from employee endpoint when available
+            // For now, we'll show all buttons. Access level filtering will be added later.
+          } else {
+            // Invalid user type
+            navigate('/employee/login')
           }
-          // TODO: Fetch access level from employee endpoint when available
-          // For now, we'll show all buttons. Access level filtering will be added later.
         }
       } catch (err) {
         // If we can't get user info, redirect to login
@@ -58,6 +78,8 @@ const EmployeeDashboard = () => {
       // Clear sessionStorage
       sessionStorage.removeItem('userId')
       sessionStorage.removeItem('sessionId')
+      sessionStorage.removeItem('role')
+      sessionStorage.removeItem('accessLevel')
       // Navigate to login page
       navigate('/employee/login', {
         state: { message: 'You have been logged out successfully.' }
@@ -67,6 +89,9 @@ const EmployeeDashboard = () => {
       // Even if logout fails, clear session storage and redirect
       sessionStorage.removeItem('userId')
       sessionStorage.removeItem('sessionId')
+      sessionStorage.removeItem('role')
+      sessionStorage.removeItem('accessLevel')
+
       navigate('/employee/login')
     } finally {
       setIsLoggingOut(false)

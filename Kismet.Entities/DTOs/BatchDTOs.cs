@@ -5,21 +5,9 @@ namespace Kismet.Entities.DTOs;
 
 
 /// <summary>
-/// DTO for returning Batch data to customers
-/// </summary>
-public class BatchResponseToCustomerDto
-{
-    public string BatchNumber { get; set; } = string.Empty;
-    public int Quantity { get; set; }
-    public decimal BatchPrice { get; set; }
-    public DateTime? ProductionDate { get; set; }
-    public string? QualityGrade { get; set; }
-}
-
-/// <summary>
 /// DTO for returning Batch data to employees
 /// </summary>
-public class BatchResponseToEmployeeDto
+public class BatchResponseDto
 {
     public int BatchID { get; set; }
     public int OrderID { get; set; }

@@ -8,17 +8,27 @@ const CustomerDashboard = () => {
   const [isLoggingOut, setIsLoggingOut] = useState(false)
   const [userId, setUserId] = useState<number | null>(null)
 
-  // Get userId from token on component mount
+  // Get userId from token on component mount and verify user type
   useEffect(() => {
     const loadCurrentUser = async () => {
       try {
         const userInfo = await sessionApi.getCurrentUser()
         if (userInfo.userId) {
-          setUserId(userInfo.userId)
-          // Also store in sessionStorage for quick access
-          sessionStorage.setItem('userId', userInfo.userId.toString())
-          if (userInfo.sessionId) {
-            sessionStorage.setItem('sessionId', userInfo.sessionId.toString())
+          // Check user type - prevent employees from accessing customer dashboard
+          if (userInfo.userType === 'Employee') {
+            // Employee trying to access customer dashboard - redirect to employee dashboard
+            navigate('/employee/dashboard')
+            return
+          } else if (userInfo.userType === 'Customer') {
+            setUserId(userInfo.userId)
+            // Also store in sessionStorage for quick access
+            sessionStorage.setItem('userId', userInfo.userId.toString())
+            if (userInfo.sessionId) {
+              sessionStorage.setItem('sessionId', userInfo.sessionId.toString())
+            }
+          } else {
+            // Invalid user type
+            navigate('/customer/login')
           }
         }
       } catch (err) {
@@ -58,6 +68,7 @@ const CustomerDashboard = () => {
       // Clear sessionStorage
       sessionStorage.removeItem('userId')
       sessionStorage.removeItem('sessionId')
+      sessionStorage.
       // Navigate to login page
       navigate('/customer/login', {
         state: { message: 'You have been logged out successfully.' }
@@ -67,6 +78,8 @@ const CustomerDashboard = () => {
       // Even if logout fails, clear session storage and redirect
       sessionStorage.removeItem('userId')
       sessionStorage.removeItem('sessionId')
+      sessionStorage.removeItem('paymentMethods')
+      sessionStorage.removeItem('bankInformation')
       navigate('/customer/login')
     } finally {
       setIsLoggingOut(false)

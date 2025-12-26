@@ -5,6 +5,7 @@ namespace Kismet.Repository.Helpers;
 /// </summary>
 public static class SqlQueries
 {
+    
     /// <summary>
     /// User table related queries
     /// </summary>
@@ -65,6 +66,7 @@ public static class SqlQueries
 
         public const string DeleteUser = "DELETE FROM dbo.[User] WHERE UserID = @UserID";
     }
+
 
     /// <summary>
     /// Session table related queries
@@ -133,6 +135,7 @@ public static class SqlQueries
             INNER JOIN dbo.[User] u ON u.UserID = s.UserID";
     }
 
+
     /// <summary>
     /// Customer table related queries
     /// </summary>
@@ -190,6 +193,7 @@ public static class SqlQueries
         public const string DeleteCustomer = "DELETE FROM dbo.[Customer] WHERE CustomerID = @CustomerID";
     }
 
+
     /// <summary>
     /// Employee table related queries
     /// </summary>
@@ -243,6 +247,7 @@ public static class SqlQueries
         public const string DeleteEmployee = "DELETE FROM dbo.[Employee] WHERE EmployeeID = @EmployeeID";
     }
 
+
     /// <summary>
     /// Order table related queries
     /// </summary>
@@ -292,8 +297,16 @@ public static class SqlQueries
             UPDATE dbo.[Order]
             SET 
                 OrderStatus = COALESCE(@OrderStatus, OrderStatus)
-            WHERE OrderID = @OrderID
-            EXEC dbo.Update_LastUpdatedAt @Table = 'Order', @ID = @OrderID, @IDColumn = 'OrderID';";
+                LastUpdatedAt = sysdatetime()
+            WHERE OrderID = @OrderID;";
+
+        // Query for cancelling an order
+        public const string CancelOrder = @"
+            UPDATE dbo.[Order]
+            SET 
+                OrderStatus = 4,
+                LastUpdatedAt = sysdatetime()
+            WHERE OrderID = @OrderID;";
 
         // Query for approving an order
         public const string ApproveOrder = @"
@@ -302,9 +315,10 @@ public static class SqlQueries
                 OrderStatus = 1,
                 IsApproved = 1,
                 ApprovedBy = @ApprovedBy,
-                ApprovalDate = sysdatetime()
-            WHERE OrderID = @OrderID
-            EXEC dbo.Update_LastUpdatedAt @Table = 'Order', @ID = @OrderID, @IDColumn = 'OrderID';";
+                ApprovalDate = sysdatetime(),
+                LastUpdatedAt = sysdatetime()
+            WHERE OrderID = @OrderID;";
+            
 
         // Query for getting the status of an order
         public const string GetOrderStatusById = @"
@@ -320,6 +334,7 @@ public static class SqlQueries
             FROM dbo.[Order] o
             WHERE o.OrderID = @OrderID";
     }
+
 
     /// <summary>
     /// Billing table related queries
@@ -397,6 +412,7 @@ public static class SqlQueries
             WHERE BillingID = @BillingID";
     }
 
+
     /// <summary>
     /// FinancialTransaction table related queries
     /// </summary>
@@ -466,6 +482,7 @@ public static class SqlQueries
             ORDER BY b.BillingDate DESC, b.BillingID DESC";
     }
 
+
     /// <summary>
     /// Payment table related queries
     /// </summary>
@@ -477,11 +494,12 @@ public static class SqlQueries
             FROM dbo.[Payment] p";
 
         public const string CreatePayment = @"
-            INSERT INTO dbo.[Payment] (BillingID, FTransactionID, PaymentAmount, PaymentType, PaymentMethod, ReferenceNumber)
-            VALUES (@BillingID, @FTransactionID, @PaymentAmount, @PaymentType, @PaymentMethod, @ReferenceNumber);
+            INSERT INTO dbo.[Payment] (FTransactionID, PaymentAmount, PaymentType, PaymentMethod, ReferenceNumber)
+            VALUES (@FTransactionID, @PaymentAmount, @PaymentType, @PaymentMethod, @ReferenceNumber);
             SELECT CAST(SCOPE_IDENTITY() as int);";
     }
   
+
     public static class Shipment
     {
         // Query for ShipOrder stored procedure
@@ -588,14 +606,6 @@ public static class SqlQueries
                 LastUpdatedAt = sysdatetime()
             WHERE ShipmentID = @ShipmentID";
 
-        // Lock shipment
-        public const string LockShipment = @"
-            UPDATE dbo.[Shipment]
-            SET 
-                IsLocked = 1,
-                LockedAt = sysdatetime()
-            WHERE ShipmentID = @ShipmentID";
-
         // Check if shipment is locked
         public const string CheckIfShipmentIsLocked = @"
             SELECT IsLocked
@@ -606,6 +616,22 @@ public static class SqlQueries
         public const string GetShipmentStatusById = @"
             SELECT ShipmentStatus
             FROM dbo.[Shipment]
+            WHERE ShipmentID = @ShipmentID";
+
+        // Update shipment origin country
+        public const string UpdateShipmentOriginCountry = @"
+            UPDATE dbo.[Shipment]
+            SET 
+                OriginCountry = @OriginCountry,
+                LastUpdatedAt = sysdatetime()
+            WHERE ShipmentID = @ShipmentID";
+            
+        // Update shipment destination country
+        public const string UpdateShipmentDestinationCountry = @"
+            UPDATE dbo.[Shipment]
+            SET 
+                DestinationCountry = @DestinationCountry,
+                LastUpdatedAt = sysdatetime()
             WHERE ShipmentID = @ShipmentID";
     }
 
@@ -660,6 +686,7 @@ public static class SqlQueries
         // Stored procedures
         // public const string CreateTreasuryEntry = "dbo.CreateTreasuryEntry"; // Now handled by trigger
     }
+
 
     public static class CustomerPayment
     {
@@ -795,20 +822,10 @@ public static class SqlQueries
             WHERE FabricID = @FabricID";
     }
 
+
     public static class Batch
     {
-        public const string GetBatchesForCustomer = @"
-            SELECT 
-                BatchNumber,
-                Quantity,
-                BatchPrice,
-                ProductionDate,
-                QualityGrade
-            FROM dbo.[Batch]
-            WHERE OrderID = @OrderID
-            ORDER BY BatchID";
-
-        public const string GetBatchesForEmployee = @"
+        public const string GetBatchesBase = @"
             SELECT 
                 BatchID,
                 OrderID,
@@ -820,9 +837,7 @@ public static class SqlQueries
                 ProductionDate,
                 QualityGrade,
                 CreatedAt
-            FROM dbo.[Batch]
-            WHERE OrderID = @OrderID
-            ORDER BY BatchID";
+            FROM dbo.[Batch]";
 
         public const string GetBatchById = @"
             SELECT 

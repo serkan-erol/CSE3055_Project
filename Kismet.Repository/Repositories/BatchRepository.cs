@@ -16,37 +16,43 @@ public class BatchRepository : IBatchRepository
         _connectionFactory = connectionFactory;
     }
 
-    public async Task<IReadOnlyList<BatchResponseToCustomerDto>> GetBatchesByOrderIdForCustomerAsync(int orderId, CancellationToken cancellationToken = default)
+
+    public async Task<IReadOnlyList<BatchResponseDto>> GetBatchesByOrderIdAsync(int orderId, CancellationToken cancellationToken = default)
     {
         using var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken);
 
-        var batches = await connection.QueryAsync<BatchResponseToCustomerDto>(
+        var batches = await connection.QueryAsync<BatchResponseDto>(
             new CommandDefinition(
-                SqlQueries.Batch.GetBatchesForCustomer, 
+                SqlQueries.Batch.GetBatchesBase + " WHERE OrderID = @OrderID", 
                 new { OrderID = orderId }, 
                 cancellationToken: cancellationToken));
         return batches.ToList().AsReadOnly();
     }
 
-    public async Task<IReadOnlyList<BatchResponseToEmployeeDto>> GetBatchesByOrderIdForEmployeeAsync(int orderId, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Get batches by ShipmentID
+    /// </summary>
+    public async Task<IReadOnlyList<BatchResponseDto>> GetBatchesByShipmentIdAsync(int shipmentId, CancellationToken cancellationToken = default)
     {
         using var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken);
-
-        var batches = await connection.QueryAsync<BatchResponseToEmployeeDto>(
+        var batches = await connection.QueryAsync<BatchResponseDto>(
             new CommandDefinition(
-                SqlQueries.Batch.GetBatchesForEmployee, 
-                new { OrderID = orderId }, 
+                SqlQueries.Batch.GetBatchesBase + " WHERE ShipmentID = @ShipmentID", 
+                new { ShipmentID = shipmentId }, 
                 cancellationToken: cancellationToken));
         return batches.ToList().AsReadOnly();
     }
 
-    public async Task<BatchResponseToEmployeeDto> GetBatchByIdAsync(int batchId, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Get batch by ID
+    /// </summary>
+    public async Task<BatchResponseDto> GetBatchByIdAsync(int batchId, CancellationToken cancellationToken = default)
     {
         using var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken);
 
-        var batch = await connection.QuerySingleOrDefaultAsync<BatchResponseToEmployeeDto>(
+        var batch = await connection.QuerySingleOrDefaultAsync<BatchResponseDto>(
             new CommandDefinition(
-                SqlQueries.Batch.GetBatchById, 
+                SqlQueries.Batch.GetBatchesBase + " WHERE BatchID = @BatchID", 
                 new { BatchID = batchId }, 
                 cancellationToken: cancellationToken));
         return batch ?? throw new InvalidOperationException("Batch not found");
@@ -119,11 +125,11 @@ public class BatchRepository : IBatchRepository
         };
     }
 
-    public async Task<IReadOnlyList<BatchResponseToEmployeeDto>> GetUnshippedBatchesByOrderIdAsync(int orderId, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<BatchResponseDto>> GetUnshippedBatchesByOrderIdAsync(int orderId, CancellationToken cancellationToken = default)
     {
         using var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken);
 
-        var batches = await connection.QueryAsync<BatchResponseToEmployeeDto>(
+        var batches = await connection.QueryAsync<BatchResponseDto>(
             new CommandDefinition(
                 SqlQueries.Batch.GetUnshippedBatches, 
                 new { OrderID = orderId }, 

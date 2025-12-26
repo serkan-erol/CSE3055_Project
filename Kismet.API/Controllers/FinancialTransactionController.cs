@@ -11,16 +11,21 @@ public class FinancialTransactionController : ControllerBase
 {
     private readonly IFinancialTransactionRepository _financialTransactionRepository;
     private readonly ICustomerRepository _customerRepository;
+    private readonly IEmployeeRepository _employeeRepository;
     private readonly IBillingRepository _billingRepository;
     private readonly IOrderRepository _orderRepository;
 
+    private const int minAccessLevel = 5;
+
     public FinancialTransactionController(IFinancialTransactionRepository financialTransactionRepository, 
                                           ICustomerRepository customerRepository,
+                                          IEmployeeRepository employeeRepository,
                                           IBillingRepository billingRepository,
                                           IOrderRepository orderRepository)
     {
         _financialTransactionRepository = financialTransactionRepository;
         _customerRepository = customerRepository;
+        _employeeRepository = employeeRepository;
         _billingRepository = billingRepository;
         _orderRepository = orderRepository;
     }
@@ -28,7 +33,7 @@ public class FinancialTransactionController : ControllerBase
     /// <summary>
     /// Get all financial transactions of a customer to be seen by the customer
     /// </summary>
-    [HttpGet("{customerId:int}/get-all-financial-transactions/for-customers")]
+    [HttpGet("{customerId:int}/get-all-customer-financial-transactions/for-customers")]
     public async Task<IActionResult> GetAllFTsForCustomerAsync(int customerId, CancellationToken cancellationToken)
     {
         try
@@ -59,13 +64,72 @@ public class FinancialTransactionController : ControllerBase
     }
 
     /// <summary>
-    /// Get all financial transactions for employees to see
+    /// Get all financial transactions of a customer for employees to see
     /// </summary>
-    [HttpGet("get-all-financial-transactions/for-employees")]
-    public async Task<IActionResult> GetAllFTsForEmployeeAsync(CancellationToken cancellationToken)
+    [HttpGet("{employeeId:int}/{customerId:int}/get-all-customer-financial-transactions/for-employees")]
+    public async Task<IActionResult> GetAllFTsByCustomerIdForEmployeeAsync(int employeeId, int customerId, CancellationToken cancellationToken)
     {
         try
         {
+            // Check if the employee exists
+            var employee = await _employeeRepository.GetByIdDtoAsync(employeeId, cancellationToken);
+            if (employee is null)
+            {
+                return NotFound(new { error = "Employee not found" });
+            }
+
+            // Check if the employee's access level is at least 5
+            if (employee.AccessLevel < minAccessLevel)
+            {
+                return BadRequest(new { error = "Employee does not have permission to get all financial transactions for customers" });
+            }
+
+            // Check if the customer exists
+            var customer = await _customerRepository.GetByIdDtoAsync(customerId, cancellationToken);
+            if (customer is null)
+            {
+                return NotFound(new { error = "Customer not found" });
+            }
+
+            // Get all financial transactions for the customer
+            var financialTransactions = await _financialTransactionRepository.GetFTByCustomerIdForEmployeeAsync(customerId, cancellationToken);
+            
+            // Check if no financial transactions found
+            if (financialTransactions.Count == 0)
+            {
+                return NotFound(new { error = "No financial transactions found" });
+            }
+
+            // Return the financial transactions
+            return Ok(financialTransactions);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Get ALL financial transactions for employees to see
+    /// </summary>
+    [HttpGet("{employeeId:int}/get-all-financial-transactions/for-employees")]
+    public async Task<IActionResult> GetAllFTsForEmployeeAsync(int employeeId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            // Check if the employee exists
+            var employee = await _employeeRepository.GetByIdDtoAsync(employeeId, cancellationToken);
+            if (employee is null)
+            {
+                return NotFound(new { error = "Employee not found" });
+            }
+
+            // Check if the employee's access level is at least 5
+            if (employee.AccessLevel < minAccessLevel)
+            {
+                return BadRequest(new { error = "Employee does not have permission to get all financial transactions" });
+            }
+
             // Get all financial transactions for the employees
             var financialTransactions = await _financialTransactionRepository.GetFTForEmployeeAsync(cancellationToken);
             
@@ -121,11 +185,24 @@ public class FinancialTransactionController : ControllerBase
     /// <summary>
     /// Get financial transaction by ID for employees to see
     /// </summary>
-    [HttpGet("{fTransactionId:int}/get-by-fTransaction-id/for-employees")]
-    public async Task<IActionResult> GetFTByIdForEmployeeAsync(int fTransactionId, CancellationToken cancellationToken)
+    [HttpGet("{employeeId:int}/{fTransactionId:int}/get-by-fTransaction-id/for-employees")]
+    public async Task<IActionResult> GetFTByIdForEmployeeAsync(int employeeId, int fTransactionId, CancellationToken cancellationToken)
     {
         try
         {
+            // Check if the employee exists
+            var employee = await _employeeRepository.GetByIdDtoAsync(employeeId, cancellationToken);
+            if (employee is null)
+            {
+                return NotFound(new { error = "Employee not found" });
+            }
+
+            // Check if the employee's access level is at least 5
+            if (employee.AccessLevel < minAccessLevel)
+            {
+                return BadRequest(new { error = "Employee does not have permission to get financial transaction by ID" });
+            }
+
             // Get the financial transaction by ID
             var financialTransaction = await _financialTransactionRepository.GetFTByIdForEmployeeAsync(fTransactionId, cancellationToken);
             
@@ -170,16 +247,11 @@ public class FinancialTransactionController : ControllerBase
     {
         try
         {
-            // Check if the payment status exists
-            var ft = await _financialTransactionRepository.GetFTByIdForEmployeeAsync(fTransactionId, cancellationToken);
-            if (ft is null)
-            {
-                return NotFound(new { error = "Financial transaction not found" });
-            }
+            // Get the payment status by ID
+            var ft = await _financialTransactionRepository.GetFTPaymentStatusAsync(fTransactionId, cancellationToken);
             
-            var paymentStatus = ft.PaymentStatus;
             // Return the payment status display name
-            return Ok(paymentStatus.GetDisplayName());
+            return Ok(ft.GetDisplayName());
         }
         catch (Exception ex)
         {
@@ -200,12 +272,6 @@ public class FinancialTransactionController : ControllerBase
             {
                 return BadRequest(ModelState);
             }
-            
-            //aaa Check if the customer ID in the DTO matches the customer ID in the URL
-            //if (dto.CustomerID != customerId)
-            //{
-            //    return BadRequest(new { error = "Customer ID mismatch" });
-            //}
 
             // Check if the customer exists
             var customer = await _customerRepository.GetByIdDtoAsync(customerId, cancellationToken);
@@ -214,16 +280,8 @@ public class FinancialTransactionController : ControllerBase
                 return NotFound(new { error = "Customer not found" });
             }
             
-            // This is not needed anymore since we are checking if the customer ID in the DTO matches the customer ID in the URL
-            // However, if we decide to get the customer ID only from the URL, we can set it in the DTO with this.
             // Set the customer ID in the DTO
             dto.CustomerID = customerId;
-
-            //aaa Check if the order ID in the DTO matches the order ID in the URL
-            //if (dto.OrderID != orderId)
-            //{
-            //    return BadRequest(new { error = "Order ID mismatch" });
-            //}
 
             // Check if the order exists
             var order = await _orderRepository.GetOrderByIdForCustomerAsync(customerId, orderId, cancellationToken);
@@ -234,8 +292,6 @@ public class FinancialTransactionController : ControllerBase
                 return NotFound(new { error = "Order not found" });
             }
 
-            // This is not needed anymore since we are checking if the order ID in the DTO matches the order ID in the URL
-            // However, if we decide to get the order ID only from the URL, we can set it in the DTO with this.
             // Set the order ID in the DTO
             dto.OrderID = orderId;
 
@@ -319,7 +375,9 @@ public class FinancialTransactionController : ControllerBase
             // Create the financial transaction
             var financialTransaction = await _financialTransactionRepository.CreateFTAsync(dto, cancellationToken);
 
-            //aaa This will be un-commented when we implement the Treasury feature
+            //aaa /OLD/ This will be un-commented when we implement the Treasury 
+            //aaa Now, a trigger handles the creation of the Treasury entry for the FT.
+            //aaa So, we do not need to create the Treasury entry here.
             // Create the treasury entry for the FT
             //var treasuryDto = new CreateTreasuryDto
             //{
@@ -388,8 +446,8 @@ public class FinancialTransactionController : ControllerBase
     /// <summary>
     /// Update the Description of a FT
     /// </summary>
-    [HttpPut("{customerId:int}/{fTransactionId:int}/update-description/")]
-    public async Task<IActionResult> UpdateFTDescriptionAsync(int customerId, int fTransactionId, [FromBody] UpdateFTDescriptionDto dto, CancellationToken cancellationToken)
+    [HttpPut("{employeeId:int}/{fTransactionId:int}/update-description/")]
+    public async Task<IActionResult> UpdateFTDescriptionAsync(int employeeId, int fTransactionId, [FromBody] UpdateFTDescriptionDto dto, CancellationToken cancellationToken)
     {
         try
         {
@@ -399,35 +457,36 @@ public class FinancialTransactionController : ControllerBase
                 return BadRequest(ModelState);
             }
 
-            dto.FTransactionID = fTransactionId;
-
-            // Check if the customer exists
-            var customer = await _customerRepository.GetByIdDtoAsync(customerId, cancellationToken);
-            if (customer is null)
+            // Check if the employee exists
+            var employee = await _employeeRepository.GetByIdDtoAsync(employeeId, cancellationToken);
+            if (employee is null)
             {
-                return NotFound(new { error = "Customer not found" });
+                return NotFound(new { error = "Employee not found" });
             }
 
-            // Get the financial transaction by ID for the customer
-            var financialTransaction = await _financialTransactionRepository.GetFTByIdForCustomerAsync(customerId, dto.FTransactionID, cancellationToken);
+            // Check if the employee's access level is at least 5
+            if (employee.AccessLevel < minAccessLevel)
+            {
+                return BadRequest(new { error = "Employee does not have permission to update the description of a financial transaction" });
+            }
+
+            // Get the FT by ID
+            var ft = await _financialTransactionRepository.GetFTByIdForEmployeeAsync(fTransactionId, cancellationToken);
             
-            // Check if the financial transaction exists
-            if (financialTransaction is null)
+            // Check if the FT exists
+            if (ft is null)
             {
                 return NotFound(new { error = "Financial transaction not found" });
             }
 
-            var updateFTDescriptionDto = new UpdateFTDescriptionDto
-            {
-                FTransactionID = dto.FTransactionID,
-                Description = dto.Description,
-            };
-            
-            // Update the financial transaction description
-            var updatedFinancialTransaction = await _financialTransactionRepository.UpdateFTDescriptionAsync(customerId, updateFTDescriptionDto, cancellationToken);
+            // Set the FTransactionID in the DTO
+            dto.FTransactionID = fTransactionId;
 
-            // Return the updated financial transaction
-            return Ok(updatedFinancialTransaction);
+            // Update the FT description
+            var updatedFT = await _financialTransactionRepository.UpdateFTDescriptionAsync(dto, cancellationToken);
+
+            // Return the updated FT
+            return Ok(updatedFT);
         }
         catch (Exception ex)
         {

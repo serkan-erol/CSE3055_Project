@@ -10,9 +10,10 @@
     DONE 3 - Add a procedure/function + trigger to prevent approving of an order without 
     full payment of previous billings + TotalDue of current order, if the Customer's 
     ReliabilityStatus is 0 (Unreliable)
-        3.1 - We might auto-approve reliable customers' purchase orders 
+        CANCEL 3.1 - We might auto-approve reliable customers' purchase orders 
         (We may change the deafult ReliabilityStatus to 0 (Unreliable))
-        3.2 - SUpply orders always require employee approval
+        3.2 - Supply orders always require employee approval but it does not matter
+        if the Customer is reliable or not
 
     DONE 4 - If a FT's TransactionDate is later then Customer's last suitable(*) Billing entry's 
     BillingDate, we will create a new Billing entry. If it is earlier, we will update the current/last 
@@ -26,25 +27,59 @@
         However, now we have either 2 Billing entries with no associated Payment entries. Purhcase FT is not paid, 
         and we did not pay the Supply FT. How are we going to deal with this?
 
-    DONE 5 - Add a trigger to auto update a FT's TotalPaid when a Payment with that FT's FK is inserted
+    DONE 5 - Add a trigger to auto update a FT's TotalPaid when a Payment with that FT's FK is inserted/deleted
 
     DONE 6 - When a Customer adds a bunch of different Fabrics and clicks to the create order button, 
         6.1 - Create an order with 0 total amount. 
         6.2 - Send the chosen fabric infos along with this Order's OrderID and save the Batches to the DB.
         6.3 - Let the 'dbo.trg_UpdateOrderTotal' to calculate Order's TotalAmount.
         6.4 - After the Order's TotalAmount is updated, create the related FT, and Billing entries.
+        6.5 - When the order is approved, create the corresponding Shipment entry/entries.
 
-    7 - Customers can add card and bank info but can not modify or delete currently. Improve it.
+    DONE 7 -  Re-arrange some repositories and controllers. Also, delete the connection between Payment and Billing.
+        DONE 7.1 - Batch: See all the Batch entries in a Shipment. 
+        Add: GetBatchByShipmentIdAsync
+        
+        DONE 7.2 - Billing: An Employee should be able to see all of a Customer's Billing entries.
+        Delete: GET/api/Billing/all-billings/for-employees and
+        Add: GET/api/Billing/{customerId}/all-billings/for-employees
 
-    8 -  Re-arrange some repositories and controllers.
+        DONE 7.3 - Customer:
+        Add: End-point for GetByEmailAsync
+        Add: Ability to GetByCustomerNumber
         
-        - Add the ability to see a Customer's all the entries in any table for an employee. End-point of this method must require 
-        a customerId and an employeeId to check if that employee has the necessary priviliges.
+        DONE 7.4 - Employee: 
+        Add: End-point for GetByEmailAsync
+        Add: Ability to GetByEmployeeNumber
         
-        - Delete the end-points that let employees see entirety of some tables without requiring any parameter etc.
-        They are quite unnecessarry
+        DONE 7.5 - Fabric: PATCH/api/Fabric/{fabricId}/stock should not ask for FabricID twice.
+        Make it [JsonIgnore in the DTO] and take the FabricID provided by router.
+
+        DONE 7.6 - FT: An Employee should be able to see all of a Customer's FT entries.
+        Add: GET/api/FinancialTransaction/{customerId}/get-all-financial-transactions/for-employees
+
+        DONE 7.7 - Order: Implement ability to cancel an Order
+        Delete: GET/api/Order/all-orders/for-employees
+        Add: End-point for cancelling an Order. Use the existing UpdateOrderStatusAsync if possible.
+        Add: GetByOrderNumber
+
+        DONE 7.8 - Shipment: Update Origin and Destination country columns based on the OrderType.
+        If the order is Purchase type, Origin Türkiye, destination Customer's Country if exists.
+        If the order is Supply type, reverse it.
+        Delete: POST/api/Shipment/{shipmentId}/lock Triggers already handle the locking of a shipment entry.
+        Add: GetDisplayName for GET/api/Shipment/{shipmentId}/status/display
+
+        DONE 7.9 - Payment: Cut the ties with Billing!!!        
     
-    9 - When the 8 is completed, add more functionality to the front-end for employees
+    8 - When the 7 is completed, add more functionality to the front-end for employees.
+
+    9 - Update the dbo.trg_Delete_FT_On_Order_Cancelled trigger to re-calculate TotalAmount and TotalPaid based on completed Payments if the order is cancelled
+
+    10 - Add a trigger to mark an Order as Cancelled (4) if its Shipments are ALL failed (3)
+        11.1 - Add a trigger to re-calculate an Order's TotalAmount (and therefore creating an update wave) if at least
+        one of its Shiptment's has failed but not all
+
+    11 - Customers can add card and bank info but can not modify or delete currently. Improve it.
 
     .
     .
