@@ -25,6 +25,7 @@ const BankInformation = () => {
   const [successMessage, setSuccessMessage] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [customerId, setCustomerId] = useState<number | null>(null)
+  const [deletingId, setDeletingId] = useState<number | null>(null)
 
   const [formData, setFormData] = useState({
     bankName: '',
@@ -118,12 +119,68 @@ const BankInformation = () => {
     setError('')
   }
 
+  const handleDelete = async (sbiId: number | null | undefined) => {
+    if (!sbiId || sbiId === null || sbiId === undefined || isNaN(Number(sbiId))) {
+      setError('Invalid bank information ID')
+      return
+    }
+
+    if (!window.confirm('Are you sure you want to delete this bank information?')) {
+      return
+    }
+
+    const idToDelete = Number(sbiId)
+    try {
+      setDeletingId(idToDelete)
+      setError('')
+      setSuccessMessage('')
+      console.log('Deleting bank information with ID:', idToDelete)
+      await bankInfoApi.delete(idToDelete)
+      setSuccessMessage('Bank information deleted successfully!')
+      // Clear deleting state before reloading
+      setDeletingId(null)
+      await loadData() // Reload data to update the list
+    } catch (err: any) {
+      console.error('Error deleting bank information:', err)
+      setError(err.response?.data?.error || err.message || 'Failed to delete bank information')
+      setDeletingId(null) // Clear on error
+    }
+  }
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
     })
+  }
+
+  // Helper function to extract ID from any object, checking all possible variations
+  const extractBankInfoId = (info: any): number | null => {
+    // Try all common variations
+    const possibleKeys = ['sbiID', 'SBIID', 'sbiId', 'SBIId', 'sBIID', 'SbiID', 'id', 'ID', 'Id']
+    
+    for (const key of possibleKeys) {
+      if (info[key] !== null && info[key] !== undefined && info[key] !== '') {
+        const value = Number(info[key])
+        if (!isNaN(value) && value > 0) {
+          return value
+        }
+      }
+    }
+    
+    // If not found, search for any key containing 'id' (case insensitive)
+    const idKey = Object.keys(info).find(key => 
+      key.toLowerCase().includes('id') && 
+      typeof info[key] === 'number' && 
+      info[key] > 0
+    )
+    
+    if (idKey) {
+      return Number(info[idKey])
+    }
+    
+    return null
   }
 
   if (loading) {
@@ -142,7 +199,6 @@ const BankInformation = () => {
           <button
             onClick={() => {
               setShowForm(true)
-              setEditingId(null)
               setFormData({ bankName: '', accountNo: '', iban: '' })
               setError('')
             }}
@@ -250,15 +306,23 @@ const BankInformation = () => {
       ) : (
         <div className="space-y-4">
           {bankInfos.map((info: any, index) => {
-            // Extract ID - handle both camelCase and PascalCase
-            const sbiID = info.sbiID ?? info.SBIID ?? info.sbiId ?? info.SBIId
+            // Extract ID using helper function
+            const sbiID = extractBankInfoId(info)
             const bankName = info.bankName ?? info.BankName
             const accountNo = info.accountNo ?? info.AccountNo
             const iban = info.iban ?? info.IBAN
             const createdAt = info.createdAt ?? info.CreatedAt
             
-            if (!sbiID) {
-              console.error('Bank info missing ID:', info)
+            if (!sbiID || isNaN(sbiID)) {
+              console.error('Bank info missing or invalid ID:', {
+                info,
+                allKeys: Object.keys(info),
+                converted: sbiID,
+                sbiIDValue: info.sbiID,
+                SBIIDValue: info.SBIID,
+                firstKey: Object.keys(info)[0],
+                firstValue: info[Object.keys(info)[0]]
+              })
             }
             
             return (
@@ -291,6 +355,21 @@ const BankInformation = () => {
                       )}
                     </div>
                   </div>
+                  <button
+                    onClick={() => {
+                      console.log('Delete clicked - sbiID:', sbiID, 'type:', typeof sbiID, 'info object:', info)
+                      if (sbiID !== null && sbiID !== undefined && !isNaN(sbiID) && sbiID > 0) {
+                        handleDelete(sbiID)
+                      } else {
+                        console.error('Cannot delete - invalid ID:', sbiID)
+                        setError(`Bank information ID is missing or invalid. ID: ${sbiID}`)
+                      }
+                    }}
+                    disabled={deletingId !== null && Number(deletingId) === Number(sbiID)}
+                    className="ml-4 px-3 py-2 text-sm bg-red-600 text-white rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {deletingId !== null && Number(deletingId) === Number(sbiID) ? 'Deleting...' : 'Delete'}
+                  </button>
                 </div>
               </div>
             )

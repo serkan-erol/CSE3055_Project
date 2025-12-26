@@ -15,7 +15,7 @@ public class FinancialTransactionController : ControllerBase
     private readonly IBillingRepository _billingRepository;
     private readonly IOrderRepository _orderRepository;
 
-    private const int minAccessLevel = 5;
+    private const int minAccessLevel = 4;
 
     public FinancialTransactionController(IFinancialTransactionRepository financialTransactionRepository, 
                                           ICustomerRepository customerRepository,
@@ -282,6 +282,12 @@ public class FinancialTransactionController : ControllerBase
             
             // Set the customer ID in the DTO
             dto.CustomerID = customerId;
+
+            // Set TransactionDate to 6 months later if not provided or if it's set to today
+            if (dto.TransactionDate == null || dto.TransactionDate.Value.Date == DateTime.UtcNow.Date)
+            {
+                dto.TransactionDate = DateTime.UtcNow.AddMonths(6);
+            }
 
             // Check if the order exists
             var order = await _orderRepository.GetOrderByIdForCustomerAsync(customerId, orderId, cancellationToken);

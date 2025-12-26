@@ -27,6 +27,7 @@ const PaymentMethods = () => {
   const [successMessage, setSuccessMessage] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [customerId, setCustomerId] = useState<number | null>(null)
+  const [deletingId, setDeletingId] = useState<number | null>(null)
 
   const [formData, setFormData] = useState({
     cardNumber: '',
@@ -114,6 +115,34 @@ const PaymentMethods = () => {
     setError('')
   }
 
+  const handleDelete = async (spmId: number | null | undefined) => {
+    if (!spmId || spmId === null || spmId === undefined || isNaN(Number(spmId))) {
+      setError('Invalid payment method ID')
+      return
+    }
+
+    if (!window.confirm('Are you sure you want to delete this payment method?')) {
+      return
+    }
+
+    const idToDelete = Number(spmId)
+    try {
+      setDeletingId(idToDelete)
+      setError('')
+      setSuccessMessage('')
+      console.log('Deleting payment method with ID:', idToDelete)
+      await paymentMethodApi.delete(idToDelete)
+      setSuccessMessage('Payment method deleted successfully!')
+      // Clear deleting state before reloading
+      setDeletingId(null)
+      await loadData() // Reload data to update the list
+    } catch (err: any) {
+      console.error('Error deleting payment method:', err)
+      setError(err.response?.data?.error || err.message || 'Failed to delete payment method')
+      setDeletingId(null) // Clear on error
+    }
+  }
+
   const formatCardNumber = (cardNumber: string) => {
     // Mask all but last 4 digits
     if (cardNumber.length <= 4) return cardNumber
@@ -126,6 +155,34 @@ const PaymentMethods = () => {
       month: 'short',
       day: 'numeric',
     })
+  }
+
+  // Helper function to extract ID from any object, checking all possible variations
+  const extractPaymentMethodId = (method: any): number | null => {
+    // Try all common variations
+    const possibleKeys = ['spmID', 'SPMID', 'spmId', 'SPMId', 'sPMID', 'SpmID', 'id', 'ID', 'Id']
+    
+    for (const key of possibleKeys) {
+      if (method[key] !== null && method[key] !== undefined && method[key] !== '') {
+        const value = Number(method[key])
+        if (!isNaN(value) && value > 0) {
+          return value
+        }
+      }
+    }
+    
+    // If not found, search for any key containing 'id' (case insensitive)
+    const idKey = Object.keys(method).find(key => 
+      key.toLowerCase().includes('id') && 
+      typeof method[key] === 'number' && 
+      method[key] > 0
+    )
+    
+    if (idKey) {
+      return Number(method[idKey])
+    }
+    
+    return null
   }
 
   if (loading) {
@@ -144,7 +201,6 @@ const PaymentMethods = () => {
           <button
             onClick={() => {
               setShowForm(true)
-              setEditingId(null)
               setFormData({ cardNumber: '', cardType: 'Debit', cardExpirationDate: '' })
               setError('')
             }}
@@ -249,15 +305,23 @@ const PaymentMethods = () => {
       ) : (
         <div className="space-y-4">
           {paymentMethods.map((method: any, index) => {
-            // Extract ID - handle both camelCase and PascalCase
-            const spmID = method.spmID ?? method.SPMID ?? method.spmId ?? method.SPMId
+            // Extract ID using helper function
+            const spmID = extractPaymentMethodId(method)
             const cardNumber = method.cardNumber ?? method.CardNumber ?? ''
             const cardType = method.cardType ?? method.CardType ?? ''
             const cardExpirationDate = method.cardExpirationDate ?? method.CardExpirationDate ?? ''
             const createdAt = method.createdAt ?? method.CreatedAt
             
-            if (!spmID) {
-              console.error('Payment method missing ID:', method)
+            if (!spmID || isNaN(spmID)) {
+              console.error('Payment method missing or invalid ID:', {
+                method,
+                allKeys: Object.keys(method),
+                converted: spmID,
+                spmIDValue: method.spmID,
+                SPMIDValue: method.SPMID,
+                firstKey: Object.keys(method)[0],
+                firstValue: method[Object.keys(method)[0]]
+              })
             }
             
             return (
@@ -286,6 +350,21 @@ const PaymentMethods = () => {
                       )}
                     </div>
                   </div>
+                  <button
+                    onClick={() => {
+                      console.log('Delete clicked - spmID:', spmID, 'type:', typeof spmID, 'method object:', method)
+                      if (spmID !== null && spmID !== undefined && !isNaN(spmID) && spmID > 0) {
+                        handleDelete(spmID)
+                      } else {
+                        console.error('Cannot delete - invalid ID:', spmID)
+                        setError(`Payment method ID is missing or invalid. ID: ${spmID}`)
+                      }
+                    }}
+                    disabled={deletingId !== null && Number(deletingId) === Number(spmID)}
+                    className="ml-4 px-3 py-2 text-sm bg-red-600 text-white rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {deletingId !== null && Number(deletingId) === Number(spmID) ? 'Deleting...' : 'Delete'}
+                  </button>
                 </div>
               </div>
             )

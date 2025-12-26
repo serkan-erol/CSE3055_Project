@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { orderApi, sessionApi } from '../../services/api'
+import { orderApi, sessionApi, shipmentApi } from '../../services/api'
 
 interface OrderResponseToEmployee {
   orderID: number
@@ -26,15 +26,32 @@ const CheckOrder = () => {
   const [isApproving, setIsApproving] = useState(false)
   const [approveError, setApproveError] = useState('')
   const [approveSuccess, setApproveSuccess] = useState('')
+  const [isShipping, setIsShipping] = useState(false)
+  const [shipError, setShipError] = useState('')
+  const [shipSuccess, setShipSuccess] = useState('')
+  const [isCancelling, setIsCancelling] = useState(false)
+  const [cancelError, setCancelError] = useState('')
+  const [cancelSuccess, setCancelSuccess] = useState('')
   const [employeeId, setEmployeeId] = useState<number | null>(null)
 
   // Get employee ID on component mount
   useEffect(() => {
     const loadEmployeeId = async () => {
       try {
+        // Try to get from sessionStorage first (faster)
+        const storedEmployeeId = sessionStorage.getItem('userId')
+        if (storedEmployeeId) {
+          setEmployeeId(parseInt(storedEmployeeId))
+        }
+        
+        // Also verify with API call
         const userInfo = await sessionApi.getCurrentUser()
         if (userInfo.userId) {
           setEmployeeId(userInfo.userId)
+          // Update sessionStorage if different
+          if (storedEmployeeId !== userInfo.userId.toString()) {
+            sessionStorage.setItem('userId', userInfo.userId.toString())
+          }
         }
       } catch (err) {
         console.error('Failed to get employee ID:', err)
@@ -133,6 +150,110 @@ const CheckOrder = () => {
     }
   }
 
+  const handleShip = async () => {
+    if (!order || !employeeId) {
+      setShipError('Unable to ship order. Please refresh the page.')
+      return
+    }
+
+    // Check if order is approved
+    if (order.orderStatus !== 1) {
+      setShipError('Only approved orders can be shipped.')
+      return
+    }
+
+    setIsShipping(true)
+    setShipError('')
+    setShipSuccess('')
+
+    try {
+      // Get existing shipments for the order (they should exist from when order was approved)
+      const shipments = await shipmentApi.getShipmentsByOrderId(order.orderID)
+      
+      if (!shipments || shipments.length === 0) {
+        setShipError('No shipments found for this order. Please ensure the order has been approved.')
+        setIsShipping(false)
+        return
+      }
+      
+      // Update status and countries for each shipment
+      // ShipmentStatus.InTransit = 1
+      for (const shipment of shipments) {
+        try {
+          // Handle both camelCase and PascalCase property names
+          const shipmentId = shipment.shipmentID || shipment.ShipmentID
+          if (shipmentId) {
+            // First, update the shipment status to InTransit (1)
+            await shipmentApi.updateShipmentStatus(employeeId, shipmentId, 1)
+            
+            // Then, update the countries
+            // The backend will automatically set origin/destination based on orderType
+            await shipmentApi.updateShipmentCountries(employeeId, shipmentId, {
+              orderType: order.orderType
+            })
+          }
+        } catch (shipmentErr: any) {
+          console.error(`Error updating shipment ${shipment.shipmentID || shipment.ShipmentID}:`, shipmentErr)
+          // Continue with other shipments even if one fails
+        }
+      }
+      
+      // Refresh order data to get updated status
+      const updatedOrder = await orderApi.getByIdForEmployee(order.orderID)
+      setOrder(updatedOrder)
+      
+      setShipSuccess('Order shipped successfully!')
+      setShipError('')
+      // Clear success message after 5 seconds
+      setTimeout(() => setShipSuccess(''), 5000)
+    } catch (err: any) {
+      console.error('Error shipping order:', err)
+      const errorMessage = err.response?.data?.error || err.message || 'Failed to ship order'
+      setShipError(errorMessage)
+      setShipSuccess('')
+    } finally {
+      setIsShipping(false)
+    }
+  }
+
+  const handleCancel = async () => {
+    if (!order || !employeeId) {
+      setCancelError('Unable to cancel order. Please refresh the page.')
+      return
+    }
+
+    // Check if order is already cancelled
+    if (order.orderStatus === 4) {
+      setCancelError('This order is already cancelled.')
+      return
+    }
+
+    // Confirm cancellation
+    if (!window.confirm('Are you sure you want to cancel this order? This action cannot be undone.')) {
+      return
+    }
+
+    setIsCancelling(true)
+    setCancelError('')
+    setCancelSuccess('')
+
+    try {
+      const cancelledOrder = await orderApi.cancelOrder(employeeId, order.orderID)
+      setOrder(cancelledOrder)
+      setCancelSuccess('Order cancelled successfully!')
+      setCancelError('')
+      // Clear success message after 5 seconds
+      setTimeout(() => setCancelSuccess(''), 5000)
+    } catch (err: any) {
+      console.error('Error cancelling order:', err)
+      const errorMessage = err.response?.data?.error || err.message || 'Failed to cancel order'
+      setCancelError(errorMessage)
+      setCancelSuccess('')
+    } finally {
+      setIsCancelling(false)
+    }
+  }
+
   const getStatusDisplay = (status: number): { text: string; color: string } => {
     switch (status) {
       case 0:
@@ -221,6 +342,26 @@ const CheckOrder = () => {
                   {isApproving ? 'Approving...' : 'Approve Order'}
                 </button>
               )}
+              {/* Ship Button - Only show if order is approved */}
+              {order.orderStatus === 1 && (
+                <button
+                  onClick={handleShip}
+                  disabled={isShipping || !employeeId}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+                >
+                  {isShipping ? 'Shipping...' : 'Ship Order'}
+                </button>
+              )}
+              {/* Cancel Button - Show if order is not cancelled and not delivered */}
+              {order.orderStatus !== 4 && order.orderStatus !== 3 && (
+                <button
+                  onClick={handleCancel}
+                  disabled={isCancelling || !employeeId}
+                  className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+                >
+                  {isCancelling ? 'Cancelling...' : 'Cancel Order'}
+                </button>
+              )}
             </div>
           </div>
 
@@ -235,6 +376,34 @@ const CheckOrder = () => {
           {approveError && (
             <div className="mb-4 bg-red-50 border border-red-200 rounded-md p-4">
               <div className="text-sm font-medium text-red-800">Error: {approveError}</div>
+            </div>
+          )}
+
+          {/* Ship Success Message */}
+          {shipSuccess && (
+            <div className="mb-4 bg-green-50 border border-green-200 rounded-md p-4">
+              <div className="text-sm font-medium text-green-800">{shipSuccess}</div>
+            </div>
+          )}
+
+          {/* Ship Error Message */}
+          {shipError && (
+            <div className="mb-4 bg-red-50 border border-red-200 rounded-md p-4">
+              <div className="text-sm font-medium text-red-800">Error: {shipError}</div>
+            </div>
+          )}
+
+          {/* Cancel Success Message */}
+          {cancelSuccess && (
+            <div className="mb-4 bg-green-50 border border-green-200 rounded-md p-4">
+              <div className="text-sm font-medium text-green-800">{cancelSuccess}</div>
+            </div>
+          )}
+
+          {/* Cancel Error Message */}
+          {cancelError && (
+            <div className="mb-4 bg-red-50 border border-red-200 rounded-md p-4">
+              <div className="text-sm font-medium text-red-800">Error: {cancelError}</div>
             </div>
           )}
 
