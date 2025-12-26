@@ -880,4 +880,30 @@ public static class SqlQueries
             FROM dbo.[Batch]
             WHERE OrderID = @OrderID";
     }
+public static class Views
+{
+    // Get order details for a customer
+    public const string GetOrderDetailsByCustomer = @"
+        SELECT * FROM vw_OrderDetails 
+        WHERE CustomerID = @CustomerID
+        ORDER BY OrderDate DESC";
+
+    // Get shipment tracking for a customer
+    public const string GetShipmentTrackingByCustomer = @"
+        SELECT * FROM vw_ShipmentTracking 
+        WHERE CustomerID = @CustomerID
+        ORDER BY ShipmentDate DESC";
+
+    // Get financial overview for a customer
+    public const string GetFinancialOverviewByCustomer = @"
+        SELECT * FROM vw_FinancialOverview 
+        WHERE CustomerID = @CustomerID
+        ORDER BY TransactionDate DESC";
+
+    // Get inventory status for a fabric
+    public const string GetInventoryStatusByFabric = @"
+        SELECT * FROM vw_InventoryProductionStatus 
+        WHERE FabricID = @FabricID";
+}
+
 }
