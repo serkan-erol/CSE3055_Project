@@ -205,7 +205,6 @@ VALUES (NULL, 0, 0, 'Starting balance');
 -- Payment --
 CREATE TABLE dbo.[Payment] (
     PaymentID        int IDENTITY PRIMARY KEY,
-    BillingID        int NOT NULL,
     FTransactionID   int NOT NULL,
     PaymentAmount    decimal(18, 2) NOT NULL CHECK (PaymentAmount > 0),
     -- 'Purchase' for the customer paying us (associated with a Purchase type Order / FinancialTransaction) 
