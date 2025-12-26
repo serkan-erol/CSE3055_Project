@@ -292,7 +292,7 @@ public class OrderController : ControllerBase
                 OrderID = order.OrderID,
                 TransactionType = dto.OrderType,
                 TotalAmount = updatedOrder.TotalAmount, // Use the calculated TotalAmount from the order
-                TransactionDate = DateTime.UtcNow.Date.AddDays(-1),
+                TransactionDate = DateTime.UtcNow.AddMonths(6), // Default to 6 months later
             };
 
             // Find or create a suitable BillingID for the FinancialTransaction
@@ -427,7 +427,7 @@ public class OrderController : ControllerBase
     /// <summary>
     /// Cancel an order by an employee
     /// </summary>
-    [HttpPut("{employeeId:int}/cancel-order/")]
+    [HttpPut("{employeeId:int}/{orderId:int}/cancel-order/")]
     public async Task<IActionResult> CancelOrderAsync(int employeeId, int orderId, CancellationToken cancellationToken)
     {
         try
@@ -459,12 +459,9 @@ public class OrderController : ControllerBase
             }
             
             // Update the order status to cancelled
-            var updatedOrder = await _orderRepository.UpdateOrderStatusAsync(
-                new UpdateOrderStatusDto 
-                { 
-                    OrderID = orderId, 
-                    OrderStatus = OrderStatus.Cancelled,
-                }, cancellationToken);
+            var updatedOrder = await _orderRepository.CancelOrderAsync(
+                orderId, 
+                cancellationToken);
 
             // Return the updated order
             return Ok(updatedOrder);

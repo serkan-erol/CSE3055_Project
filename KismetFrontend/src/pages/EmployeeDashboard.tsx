@@ -57,6 +57,13 @@ const EmployeeDashboard = () => {
   const getActivePage = () => {
     const path = location.pathname
     if (path.includes('check-order')) return 'check-order'
+    if (path.includes('check-shipment')) return 'check-shipment'
+    if (path.includes('manage-fabric')) return 'manage-fabric'
+    if (path.includes('manage-finance')) return 'manage-finance'
+    if (path.includes('manage-payment')) return 'manage-payment'
+    if (path.includes('manage-treasury')) return 'manage-treasury'
+    if (path.includes('manage-employee')) return 'manage-employee'
+    if (path.includes('views')) return 'views'
     if (path.includes('settings')) return 'settings'
     return ''
   }
@@ -75,22 +82,27 @@ const EmployeeDashboard = () => {
       if (currentUserId) {
         await sessionApi.logout(currentUserId)
       }
-      // Clear sessionStorage
-      sessionStorage.removeItem('userId')
-      sessionStorage.removeItem('sessionId')
-      sessionStorage.removeItem('role')
-      sessionStorage.removeItem('accessLevel')
+      // Clear all sessionStorage
+      sessionStorage.clear()
+      // Clear all cookies
+      document.cookie.split(";").forEach((c) => {
+        document.cookie = c
+          .replace(/^ +/, "")
+          .replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/")
+      })
       // Navigate to login page
       navigate('/employee/login', {
         state: { message: 'You have been logged out successfully.' }
       })
     } catch (err: any) {
       console.error('Logout error:', err)
-      // Even if logout fails, clear session storage and redirect
-      sessionStorage.removeItem('userId')
-      sessionStorage.removeItem('sessionId')
-      sessionStorage.removeItem('role')
-      sessionStorage.removeItem('accessLevel')
+      // Even if logout fails, clear session storage and cookies and redirect
+      sessionStorage.clear()
+      document.cookie.split(";").forEach((c) => {
+        document.cookie = c
+          .replace(/^ +/, "")
+          .replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/")
+      })
 
       navigate('/employee/login')
     } finally {
@@ -103,13 +115,72 @@ const EmployeeDashboard = () => {
     const buttons = []
 
     // Check Order - available for all employees (for now)
-    // TODO: Add access level checks when employee endpoint is available
-    buttons.push({
-      key: 'check-order',
-      label: 'Check Order',
-      path: 'check-order',
-      accessLevel: null // null means available to all
-    })
+    if (accessLevel !== null && accessLevel >= 3) {
+      buttons.push({
+        key: 'check-order',
+        label: 'Check Order',
+        path: 'check-order',
+        accessLevel: 3
+      })
+    }
+
+    // Check Shipment - requires AccessLevel >= 3
+    if (accessLevel !== null && accessLevel >= 3) {
+      buttons.push({
+        key: 'check-shipment',
+        label: 'Check Shipment',
+        path: 'check-shipment',
+        accessLevel: 3
+      })
+    }
+
+    // Manage Fabric - requires AccessLevel >= 5
+    if (accessLevel !== null && accessLevel >= 5) {
+      buttons.push({
+        key: 'manage-fabric',
+        label: 'Manage Fabric',
+        path: 'manage-fabric',
+        accessLevel: 5
+      })
+    }
+
+    // Manage Employee - requires AccessLevel >= 5
+    if (accessLevel !== null && accessLevel >= 5) {
+      buttons.push({
+        key: 'manage-employee',
+        label: 'Manage Employee',
+        path: 'manage-employee',
+        accessLevel: 5
+      })
+    }
+
+    // Finance, Payment, Treasury, Views - require AccessLevel >= 4
+    if (accessLevel !== null && accessLevel >= 4) {
+      buttons.push({
+        key: 'manage-finance',
+        label: 'Finance',
+        path: 'manage-finance',
+        accessLevel: 4
+      })
+      buttons.push({
+        key: 'manage-payment',
+        label: 'Payment',
+        path: 'manage-payment',
+        accessLevel: 4
+      })
+      buttons.push({
+        key: 'manage-treasury',
+        label: 'Treasury',
+        path: 'manage-treasury',
+        accessLevel: 4
+      })
+      buttons.push({
+        key: 'views',
+        label: 'Views',
+        path: 'views',
+        accessLevel: 4
+      })
+    }
 
     // Add more buttons here based on access level
     // Example:

@@ -36,7 +36,7 @@ public class CreateSavedPaymentMethodDto
     [Required]
     public DateTime CardExpirationDate { get; set; }
     
-    public DateTime? RecordExpirationDate { get; set; }
+    public DateTime? RecordExpirationDate { get; set; } = DateTime.Now.AddYears(5);
 }
 
 /// <summary>
@@ -44,16 +44,13 @@ public class CreateSavedPaymentMethodDto
 /// </summary>
 public class UpdateSavedPaymentMethodDto
 {
-    [Required]
     [StringLength(255)]
-    public string CardNumber { get; set; } = string.Empty;
+    public string? CardNumber { get; set; } = string.Empty;
     
-    [Required]
     [StringLength(20)]
-    public string CardType { get; set; } = string.Empty; // 'Debit' or 'Credit'
+    public string? CardType { get; set; } = string.Empty; // 'Debit' or 'Credit'
     
-    [Required]
-    public DateTime CardExpirationDate { get; set; }
+    public DateTime? CardExpirationDate { get; set; }
     
     public DateTime? RecordExpirationDate { get; set; }
 }

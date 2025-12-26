@@ -51,6 +51,10 @@ public class ShipOrderDto
     [Required]
     [JsonIgnore]
     public int OrderID { get; set; }
+
+    [JsonIgnore]
+    [StringLength(100)]
+    public string? CustomsDocRef { get; set; } = string.Empty;
 }
 
 /// <summary>

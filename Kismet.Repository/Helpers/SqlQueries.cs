@@ -296,7 +296,7 @@ public static class SqlQueries
         public const string UpdateOrderStatus = @"
             UPDATE dbo.[Order]
             SET 
-                OrderStatus = COALESCE(@OrderStatus, OrderStatus)
+                OrderStatus = COALESCE(@OrderStatus, OrderStatus),
                 LastUpdatedAt = sysdatetime()
             WHERE OrderID = @OrderID;";
 

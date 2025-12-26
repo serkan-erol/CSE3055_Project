@@ -113,6 +113,10 @@ export const orderApi = {
     const response = await api.put(`/Order/${employeeId}/approve-order/`, { orderID: orderId })
     return response.data
   },
+  cancelOrder: async (employeeId: number, orderId: number) => {
+    const response = await api.put(`/Order/${employeeId}/${orderId}/cancel-order/`)
+    return response.data
+  },
   createOrder: async (customerId: number, data: {
     orderType: string
     fabricIDs: number[]
@@ -132,6 +136,24 @@ export const fabricApi = {
   },
   getById: async (fabricId: number) => {
     const response = await api.get(`/Fabric/${fabricId}`)
+    return response.data
+  },
+  create: async (employeeId: number, data: {
+    fabricType: string
+    composition?: string
+    color?: string
+    weightPerUnit?: number
+    stockQuantity: number
+    unitPrice: number
+    description?: string
+  }) => {
+    const response = await api.post(`/Fabric/${employeeId}/create-fabric`, data)
+    return response.data
+  },
+  updateStock: async (fabricId: number, quantityChange: number) => {
+    const response = await api.patch(`/Fabric/${fabricId}/stock`, {
+      quantityChange: quantityChange
+    })
     return response.data
   },
 }
@@ -200,6 +222,161 @@ export const bankInfoApi = {
   },
   delete: async (sbiId: number) => {
     const response = await api.delete(`/CustomerPayment/bank-information/${sbiId}`)
+    return response.data
+  },
+}
+
+// Shipment API functions
+export const shipmentApi = {
+  updateShipmentStatus: async (employeeId: number, shipmentId: number, shipmentStatus: number) => {
+    const response = await api.patch(`/Shipment/${employeeId}/${shipmentId}/status`, {
+      shipmentStatus: shipmentStatus
+    })
+    return response.data
+  },
+  updateShipmentCountries: async (employeeId: number, shipmentId: number, data: {
+    orderType: string
+    originCountry?: string
+    destinationCountry?: string
+  }) => {
+    const response = await api.patch(`/Shipment/${employeeId}/${shipmentId}/countries`, data)
+    return response.data
+  },
+  getShipmentsByOrderId: async (orderId: number) => {
+    const response = await api.get(`/Shipment/order/${orderId}`)
+    return response.data
+  },
+  getShipmentById: async (shipmentId: number) => {
+    const response = await api.get(`/Shipment/${shipmentId}`)
+    return response.data
+  },
+}
+
+// Financial Transaction API functions
+export const financialTransactionApi = {
+  getByCustomerId: async (employeeId: number, customerId: number) => {
+    const response = await api.get(`/FinancialTransaction/${employeeId}/${customerId}/get-all-customer-financial-transactions/for-employees`)
+    return response.data
+  },
+  getById: async (employeeId: number, fTransactionId: number) => {
+    const response = await api.get(`/FinancialTransaction/${employeeId}/${fTransactionId}/get-by-fTransaction-id/for-employees`)
+    return response.data
+  },
+  updateDescription: async (employeeId: number, fTransactionId: number, description: string) => {
+    const response = await api.put(`/FinancialTransaction/${employeeId}/${fTransactionId}/update-description/`, {
+      description: description
+    })
+    return response.data
+  },
+}
+
+// Payment API functions
+export const paymentApi = {
+  getById: async (paymentId: number) => {
+    const response = await api.get(`/Payment/${paymentId}/get-by-payment-id/`)
+    return response.data
+  },
+  getByCustomerId: async (customerId: number) => {
+    const response = await api.get(`/Payment/${customerId}/get-all-customer-payments`)
+    return response.data
+  },
+  create: async (customerId: number, fTransactionId: number, data: {
+    paymentAmount: number
+    paymentType: string
+    paymentMethod?: string
+    referenceNumber?: string
+  }) => {
+    const response = await api.post(`/Payment/create-payment/?customerId=${customerId}&fTransactionId=${fTransactionId}`, {
+      paymentAmount: data.paymentAmount,
+      paymentType: data.paymentType,
+      paymentMethod: data.paymentMethod,
+      referenceNumber: data.referenceNumber
+    })
+    return response.data
+  },
+}
+
+// Financial Transaction API functions for customers
+export const financialTransactionApiCustomer = {
+  getAll: async (customerId: number) => {
+    const response = await api.get(`/FinancialTransaction/${customerId}/get-all-customer-financial-transactions/for-customers`)
+    return response.data
+  },
+}
+
+// Views API functions
+export const viewsApi = {
+  getOrderDetails: async (customerId: number) => {
+    const response = await api.get(`/Views/orders/customer/${customerId}`)
+    return response.data
+  },
+  getShipmentTracking: async (customerId: number) => {
+    const response = await api.get(`/Views/shipments/customer/${customerId}`)
+    return response.data
+  },
+  getFinancialOverview: async (customerId: number) => {
+    const response = await api.get(`/Views/financial/customer/${customerId}`)
+    return response.data
+  },
+  getInventoryStatus: async (fabricId: number) => {
+    const response = await api.get(`/Views/inventory/fabric/${fabricId}`)
+    return response.data
+  },
+}
+
+// Treasury API functions
+export const treasuryApi = {
+  getBalance: async (employeeId: number) => {
+    const response = await api.get(`/Treasury/${employeeId}/balance`)
+    return response.data
+  },
+  getAll: async (employeeId: number) => {
+    const response = await api.get(`/Treasury/${employeeId}`)
+    return response.data
+  },
+  getById: async (employeeId: number, treasuryId: number) => {
+    const response = await api.get(`/Treasury/${employeeId}/${treasuryId}/get-by-id`)
+    return response.data
+  },
+  getByTransactionId: async (employeeId: number, fTransactionId: number) => {
+    const response = await api.get(`/Treasury/${employeeId}/${fTransactionId}/get-by-transaction-id`)
+    return response.data
+  },
+}
+
+// Employee API functions
+export const employeeApi = {
+  getAll: async (employeeId: number) => {
+    const response = await api.get(`/Employee/${employeeId}/all-employees`)
+    return response.data
+  },
+  getById: async (employeeId: number) => {
+    const response = await api.get(`/Employee/${employeeId}/employee-by-id`)
+    return response.data
+  },
+  create: async (employeeId: number, data: {
+    userName: string
+    contactEmail: string
+    contactPhone?: string
+    password: string
+    employeeRole: string
+    accessLevel: number
+  }) => {
+    const response = await api.post(`/Employee/${employeeId}/create-employee`, data)
+    return response.data
+  },
+  updateRole: async (updaterEmployeeId: number, employeeId: number, employeeRole: string) => {
+    const response = await api.put(`/Employee/${updaterEmployeeId}/role`, {
+      employeeID: employeeId,
+      employeeRole: employeeRole
+    })
+    return response.data
+  },
+  updateAccessLevel: async (updaterEmployeeId: number, employeeId: number, accessLevel: number) => {
+    const response = await api.put(`/Employee/${updaterEmployeeId}/access-level`, {
+      employeeID: employeeId,
+      accessLevel: accessLevel
+    })
     return response.data
   },
 }

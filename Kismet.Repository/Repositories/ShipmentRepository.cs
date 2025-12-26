@@ -86,10 +86,14 @@ public class ShipmentRepository : IShipmentRepository
 {
     using var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken);
 
+    // Create a CustomsDocRef for the shipment
+    var customsDocRef = Guid.NewGuid().ToString();
+    dto.CustomsDocRef = customsDocRef;
+    
     var shipments = await connection.QueryAsync<ShipOrderResponseDto>(
         new CommandDefinition(
             SqlQueries.Shipment.ShipOrder,
-            new { OrderID = dto.OrderID, EmployeeID = dto.EmployeeID },
+            new { OrderID = dto.OrderID, EmployeeID = dto.EmployeeID, CustomsDocRef = customsDocRef },
             commandType: System.Data.CommandType.StoredProcedure,
             cancellationToken: cancellationToken));
 
@@ -230,21 +234,25 @@ public class ShipmentRepository : IShipmentRepository
 
         if (dto.OriginCountry is not null)
         {
+            var originCountry = new { ShipmentID = dto.ShipmentID, OrderType = dto.OrderType, OriginCountry = dto.OriginCountry };
+
             // Update shipment origin country
             await connection.ExecuteAsync(
-            new CommandDefinition(
-                SqlQueries.Shipment.UpdateShipmentOriginCountry, 
-                dto, 
-                cancellationToken: cancellationToken));
+                new CommandDefinition(
+                    SqlQueries.Shipment.UpdateShipmentOriginCountry, 
+                    originCountry, 
+                    cancellationToken: cancellationToken));
         }
 
         if (dto.DestinationCountry is not null)
         {
+            var destinationCountry = new { ShipmentID = dto.ShipmentID, OrderType = dto.OrderType, DestinationCountry = dto.DestinationCountry };
+            
             // Update shipment destination country
             await connection.ExecuteAsync(
                 new CommandDefinition(
                     SqlQueries.Shipment.UpdateShipmentDestinationCountry, 
-                    dto, 
+                    destinationCountry, 
                     cancellationToken: cancellationToken));
         }
 
