@@ -179,6 +179,38 @@ public class UserRepository : IUserRepository
         }
     }
 
+    /// <summary>
+    /// If a user password is not hashed in DB, hash it
+    /// </summary>
+    public async Task<bool> UpdateUserPasswordToHashAsync(int userId, string passwordHash, CancellationToken cancellationToken = default)
+    {
+        using var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken);
+        using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+
+        try
+        {
+            await connection.ExecuteAsync(
+                new CommandDefinition(SqlQueries.User.UpdateUserPassword, new
+                {
+                    UserID = userId,
+                    PasswordHash = passwordHash
+                }, transaction, cancellationToken: cancellationToken));
+
+            await transaction.CommitAsync(cancellationToken);
+            return true;
+        }
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
+        finally
+        {
+            await transaction.DisposeAsync();
+            await connection.DisposeAsync();
+        }
+    }
+
     public async Task<bool> DeleteAsync(int userId, CancellationToken cancellationToken = default)
     {
         // Delete from User

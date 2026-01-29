@@ -367,6 +367,8 @@ BEGIN
     DECLARE @Exists       bit = 1;
     DECLARE @Attempts     int = 0;
     DECLARE @TableName    nvarchar(50);
+    DECLARE @NumberColumn nvarchar(50);
+    DECLARE @IDColumn     nvarchar(50);
 
     IF @Prefix NOT IN ('E', 'C', 'P', 'S')
     BEGIN
@@ -379,6 +381,16 @@ BEGIN
                           WHEN @Prefix = 'C' THEN 'Customer' 
                           WHEN @Prefix = 'P' OR @Prefix = 'S' THEN 'Order' END;
 
+    -- Set Number column name based on prefix
+    SET @NumberColumn = CASE WHEN @Prefix = 'E' THEN 'EmployeeNumber' 
+                          WHEN @Prefix = 'C' THEN 'CustomerNumber' 
+                          WHEN @Prefix = 'P' OR @Prefix = 'S' THEN 'OrderNumber' END;
+
+    -- Set ID column name based on prefix
+    SET @IDColumn = CASE WHEN @Prefix = 'E' THEN 'EmployeeID' 
+                          WHEN @Prefix = 'C' THEN 'CustomerID' 
+                          WHEN @Prefix = 'P' OR @Prefix = 'S' THEN 'OrderID' END;
+
     -- Try until we find a unique number or hit the attempt limit
     WHILE @Exists = 1 AND @Attempts < @MaxAttempts
     BEGIN
@@ -390,23 +402,28 @@ BEGIN
         -- 10 digit complete number
         SET @GeneratedNumber = @Prefix + @RandomDigits;
 
-        IF @Prefix = 'E'
-        BEGIN
-            IF NOT EXISTS (SELECT 1 FROM dbo.[Employee] WHERE EmployeeNumber = @GeneratedNumber)
-                SET @Exists = 0;
-        END
-        ELSE IF @Prefix = 'C'
-        BEGIN
-            IF NOT EXISTS (SELECT 1 FROM dbo.[Customer] WHERE CustomerNumber = @GeneratedNumber)
-                SET @Exists = 0;
-        END
-        ELSE IF @Prefix = 'P' OR @Prefix = 'S'
-        BEGIN
-            IF NOT EXISTS (SELECT 1 FROM dbo.[Order] WHERE OrderNumber = @GeneratedNumber)
-                SET @Exists = 0;
-        END
+        -- Check if the generated number already exists using dynamic SQL
+        DECLARE @CheckSQL nvarchar(MAX);
+        DECLARE @ExistsResult int = 0;
+        
+        -- Create the SQL code to check if the generated number already exists in the corresponding table
+        SET @CheckSQL = N'SELECT @ExistsResult = CASE WHEN EXISTS (
+            SELECT 1 FROM ' + QUOTENAME('dbo') + N'.' + QUOTENAME(@TableName) + N' 
+            WHERE ' + QUOTENAME(@NumberColumn) + N' = @GeneratedNumber
+        ) THEN 1 ELSE 0 END';
+        
+        -- Execute the SQL code
+        EXEC sp_executesql @CheckSQL, 
+            N'@GeneratedNumber char(10), @ExistsResult int OUTPUT', 
+            @GeneratedNumber = @GeneratedNumber, 
+            @ExistsResult = @ExistsResult OUTPUT;
+        
+        -- If the generated number does not exist, set the @Exists flag to 0
+        IF @ExistsResult = 0
+            SET @Exists = 0;
     END
 
+    -- If the generated number does not exist after all attempts, raise an error
     IF @Exists = 1
     BEGIN
         RAISERROR('Unable to generate unique %sNumber after %d attempts.', 16, 1, @TableName, @MaxAttempts);
@@ -414,24 +431,14 @@ BEGIN
     END
 
     -- Persist the generated number on the correct table
-    IF @Prefix = 'E'
-    BEGIN
-        UPDATE dbo.[Employee]
-        SET EmployeeNumber = @GeneratedNumber
-        WHERE EmployeeID = @Id;
-    END
-    ELSE IF @Prefix = 'C'
-    BEGIN
-        UPDATE dbo.[Customer]
-        SET CustomerNumber = @GeneratedNumber
-        WHERE CustomerID = @Id;
-    END
-    ELSE IF @Prefix = 'P' OR @Prefix = 'S'
-    BEGIN
-        UPDATE dbo.[Order]
-        SET OrderNumber = @GeneratedNumber
-        WHERE OrderID = @Id;
-    END
+    DECLARE @SQL nvarchar(MAX);
+    -- Create the SQL code to update the number column with the generated number and set the table name, number column and ID column
+    SET @SQL = N'UPDATE ' + QUOTENAME('dbo') + N'.' + QUOTENAME(@TableName) + N' 
+                 SET ' + QUOTENAME(@NumberColumn) + N' = @GeneratedNumber
+                 WHERE ' + QUOTENAME(@IDColumn) + N' = @Id';
+
+    -- Execute the SQL statement
+    EXEC sp_executesql @SQL, N'@GeneratedNumber nvarchar(10), @ID int', @GeneratedNumber = @GeneratedNumber, @ID = @Id;
 END;
 GO
 
@@ -2054,7 +2061,7 @@ INSERT INTO dbo.[Fabric] (FabricType, Composition, Color, WeightPerUnit, StockQu
 VALUES ('Polyester', '70% Polyester + 30% Cotton', 'White', 1.00, 100, 10.00, 'Silver polyester fabric');
 INSERT INTO dbo.[Fabric] (FabricType, Composition, Color, WeightPerUnit, StockQuantity, UnitPrice, Description)
 VALUES ('Polyester', '70% Polyester + 30% Cotton', 'White', 1.00, 100, 10.00, 'Gold polyester fabric');
-
+GO
 
 ---------------------------------------------------------------------------------------------------------------
 -----------------------------------------------VIEWS-----------------------------------------------------------

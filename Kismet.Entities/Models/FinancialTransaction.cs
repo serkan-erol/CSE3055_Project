@@ -61,9 +61,9 @@ namespace Kismet.Entities.Models {
         public string? Description { get; set; }
 
         [Required]
-        [Column("TransactionDate")]
+        [Column("TransactionDate", TypeName = "date")]
         //aaa [DatabaseGenerated(DatabaseGeneratedOption.Computed)]
-        public DateTime TransactionDate { get; set; }
+        public DateOnly TransactionDate { get; set; }
 
         [Column("LastUpdatedAt")]
         public DateTimeOffset? LastUpdatedAt { get; set; }

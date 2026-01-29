@@ -16,7 +16,7 @@ public class BatchResponseDto
     public string BatchNumber { get; set; } = string.Empty;
     public int Quantity { get; set; }
     public decimal BatchPrice { get; set; }
-    public DateTime? ProductionDate { get; set; }
+    public DateOnly? ProductionDate { get; set; }
     public string? QualityGrade { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
 }

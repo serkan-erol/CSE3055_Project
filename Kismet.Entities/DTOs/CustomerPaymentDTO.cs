@@ -11,10 +11,10 @@ public class SavedPaymentMethodResponseDto
     public int CustomerID { get; set; }
     public string CardNumber { get; set; } = string.Empty;
     public string CardType { get; set; } = string.Empty;
-    public DateTime CardExpirationDate { get; set; }
-    public DateTime? RecordExpirationDate { get; set; }
-    public DateTime CreatedAt { get; set; }
-    public DateTime? LastUpdatedAt { get; set; }
+    public DateOnly CardExpirationDate { get; set; }
+    public DateOnly? RecordExpirationDate { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
+    public DateTimeOffset? LastUpdatedAt { get; set; }
 }
 
 /// <summary>
@@ -34,9 +34,9 @@ public class CreateSavedPaymentMethodDto
     public string CardType { get; set; } = string.Empty; // 'Debit' or 'Credit'
     
     [Required]
-    public DateTime CardExpirationDate { get; set; }
+    public DateOnly CardExpirationDate { get; set; }
     
-    public DateTime? RecordExpirationDate { get; set; } = DateTime.Now.AddYears(5);
+    public DateOnly? RecordExpirationDate { get; set; } = DateOnly.FromDateTime(DateTime.UtcNow).AddYears(5);
 }
 
 /// <summary>
@@ -50,9 +50,9 @@ public class UpdateSavedPaymentMethodDto
     [StringLength(20)]
     public string? CardType { get; set; } = string.Empty; // 'Debit' or 'Credit'
     
-    public DateTime? CardExpirationDate { get; set; }
+    public DateOnly? CardExpirationDate { get; set; }
     
-    public DateTime? RecordExpirationDate { get; set; }
+    public DateOnly? RecordExpirationDate { get; set; }
 }
 
 /// <summary>
@@ -65,8 +65,8 @@ public class SavedBankInformationResponseDto
     public string? BankName { get; set; }
     public string? AccountNo { get; set; }
     public string? IBAN { get; set; }
-    public DateTime CreatedAt { get; set; }
-    public DateTime? LastUpdatedAt { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
+    public DateTimeOffset? LastUpdatedAt { get; set; }
 }
 
 /// <summary>

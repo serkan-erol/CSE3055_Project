@@ -17,7 +17,7 @@ public class BillingResponseToEmployeeDto
     public decimal TotalPaid { get; set; }
     public decimal RemainingBalance { get; set; }
     public string? PaymentTerms { get; set; }
-    public DateTime BillingDate { get; set; }
+    public DateOnly BillingDate { get; set; }
     public PaymentStatus BillingStatus { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset? LastUpdatedAt { get; set; }
@@ -36,7 +36,7 @@ public class BillingResponseToCustomerDto
     public decimal TotalPaid { get; set; }
     public decimal RemainingBalance { get; set; }
     public string? PaymentTerms { get; set; }
-    public DateTime BillingDate { get; set; }
+    public DateOnly BillingDate { get; set; }
     public DateTimeOffset? LastUpdatedAt { get; set; }
 }
 
@@ -73,7 +73,7 @@ public class CreateBillingDto
     public string? PaymentTerms { get; set; }
 
     //aaa [DataType(DataType.Date)]
-    public DateTime? BillingDate { get; set; } = DateTime.UtcNow.AddMonths(6);
+    public DateOnly? BillingDate { get; set; }
 }
 
 // We WON'T use this DTO, IF we choose to represent Purchase and Supply type FTs in separate Billing entries
@@ -132,5 +132,5 @@ public class UpdateBillingDateDto
 
     [Required]
     //aaa [DataType(DataType.Date)]
-    public DateTime BillingDate { get; set; }
+    public DateOnly BillingDate { get; set; }
 }

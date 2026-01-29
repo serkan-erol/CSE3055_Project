@@ -1,3 +1,5 @@
+using Dapper;
+using Kismet.Repository.Helpers;
 using Kismet.Repository.Interfaces;
 using Kismet.Repository.Repositories;
 using Microsoft.Extensions.DependencyInjection;
@@ -8,23 +10,22 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddRepositories(this IServiceCollection services)
     {
+        // Register Dapper type handlers for DateOnly
+        SqlMapper.AddTypeHandler(new DateOnlyTypeHandler());
+        SqlMapper.AddTypeHandler(new NullableDateOnlyTypeHandler());
+        
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<ISessionRepository, SessionRepository>();
-        services.AddScoped<ICustomerRepository, CustomerRepository>();
         services.AddScoped<IEmployeeRepository, EmployeeRepository>();
-        services.AddScoped<IOrderRepository, OrderRepository>();
-        services.AddScoped<IBillingRepository, BillingRepository>();
-        services.AddScoped<IFinancialTransactionRepository, FinancialTransactionRepository>();
-        //aaa services.AddScoped<ITreasuryRepository, TreasuryRepository>();
-        services.AddScoped<IPaymentRepository, PaymentRepository>();
-        //aaa services.AddScoped<IShipmentRepository, ShipmentRepository>();
-        //aaa services.AddScoped<IFinancialTransactionRepository, FinancialTransactionRepository>();
-        services.AddScoped<ITreasuryRepository, TreasuryRepository>();
+        services.AddScoped<ICustomerRepository, CustomerRepository>();
         services.AddScoped<ICustomerPaymentRepository, CustomerPaymentRepository>();
-        //aaa services.AddScoped<IPaymentRepository, PaymentRepository>();
+        services.AddScoped<IBillingRepository, BillingRepository>();
+        services.AddScoped<IOrderRepository, OrderRepository>();
+        services.AddScoped<IFinancialTransactionRepository, FinancialTransactionRepository>();
+        services.AddScoped<IPaymentRepository, PaymentRepository>();
+        services.AddScoped<ITreasuryRepository, TreasuryRepository>();
         services.AddScoped<IShipmentRepository, ShipmentRepository>();
         services.AddScoped<IFabricRepository, FabricRepository>();
-        //aaa services.AddScoped<IUnitPriceRepository, UnitPriceRepository>();
         services.AddScoped<IBatchRepository, BatchRepository>();
         services.AddScoped<IViewRepository, ViewRepository>();
         return services;

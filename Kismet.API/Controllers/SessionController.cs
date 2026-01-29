@@ -85,17 +85,30 @@ public class SessionController : ControllerBase
                 return NotFound(new { error = "User not found" });
             }
 
+            var passwordHash = string.Empty;
+
             // Check if User's password is hashed in the DB or not
-            // This adds support for adding new users to the DB directly with inserts in SQL code
-            if (!user.PasswordHash.StartsWith("$2a$"))
+            // This is required to support adding new users to the DB directly with inserts in SQL code
+            // And it also updates raw passwords to hashed passwords in the DB
+            if (!user.PasswordHash.StartsWith("$2a$")) // BCrypt hash prefix
             {
-                // The password is not hashed, so we need to hash it
-                var passwordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password);
-                user.PasswordHash = passwordHash;
+                // First, hash the password
+                // So we can compare the hashed password with the password in the DTO for login verification
+                // And we can save the hashed password to the DB for extra security
+                passwordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password);
+
+                // Then, save the hashed password to the DB
+                await _userRepository.UpdateUserPasswordToHashAsync(user.UserID, passwordHash, cancellationToken);
+            }
+            
+            // If the password is already hashed in the DB, use the password hash from the DB
+            else
+            {
+                passwordHash = user.PasswordHash;
             }
 
             // Verify the password
-            var isPasswordValid = BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash);
+            var isPasswordValid = BCrypt.Net.BCrypt.Verify(dto.Password, passwordHash);
             if (!isPasswordValid)
             {
                 return BadRequest(new { error = "Invalid password" });

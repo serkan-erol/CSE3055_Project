@@ -7,7 +7,6 @@ const EmployeeDashboard = () => {
   const location = useLocation()
   const [isLoggingOut, setIsLoggingOut] = useState(false)
   const [userId, setUserId] = useState<number | null>(null)
-  //aaa Will be implemented later to decide/limit an employees acces to certain api-endpoints
   const [accessLevel, setAccessLevel] = useState<number | null>(null)
 
   // Get userId from token on component mount and verify user type
@@ -258,4 +257,3 @@ const EmployeeDashboard = () => {
 }
 
 export default EmployeeDashboard
-

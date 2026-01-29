@@ -292,17 +292,16 @@ public class OrderController : ControllerBase
                 OrderID = order.OrderID,
                 TransactionType = dto.OrderType,
                 TotalAmount = updatedOrder.TotalAmount, // Use the calculated TotalAmount from the order
-                TransactionDate = DateTime.UtcNow.AddMonths(6), // Default to 6 months later
+                TransactionDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(6), // Default to 6 months later
             };
 
             // Find or create a suitable BillingID for the FinancialTransaction
             // Check if there are any suitable Billing entries for the FT
             var suitableBillingEntry = await _financialTransactionRepository.FindSuitableBillingEntryForFTAsync(financialTransactionDto, cancellationToken);
-            
+
             // If there is not any, create a new Billing entry for the FT
             if (suitableBillingEntry is null)
             {
-
                 // Create a new Billing entry for the FT
                 var newBillingDto = new CreateBillingDto
                 {

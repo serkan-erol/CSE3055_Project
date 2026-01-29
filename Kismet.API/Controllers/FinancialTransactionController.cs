@@ -284,9 +284,9 @@ public class FinancialTransactionController : ControllerBase
             dto.CustomerID = customerId;
 
             // Set TransactionDate to 6 months later if not provided or if it's set to today
-            if (dto.TransactionDate == null || dto.TransactionDate.Value.Date == DateTime.UtcNow.Date)
+            if (dto.TransactionDate == null || dto.TransactionDate.Value == DateOnly.FromDateTime(DateTime.UtcNow))
             {
-                dto.TransactionDate = DateTime.UtcNow.AddMonths(6);
+                dto.TransactionDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(6);
             }
 
             // Check if the order exists
@@ -345,6 +345,7 @@ public class FinancialTransactionController : ControllerBase
             {
                 // Check if there are any suitable Billing entries for the FT
                 var suitableBillingEntry = await _financialTransactionRepository.FindSuitableBillingEntryForFTAsync(dto, cancellationToken);
+                
                 // If there is not any, create a new Billing entry for the FT
                 if (suitableBillingEntry is null)
                 {

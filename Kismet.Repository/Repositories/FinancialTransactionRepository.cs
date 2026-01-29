@@ -133,7 +133,6 @@ public class FinancialTransactionRepository : IFinancialTransactionRepository
     
     /// <summary>
     /// Create a new FT for customer and order
-    /// //aaa TotalAmount should come from Order table
     /// </summary>
     public async Task<FTResponseToCustomerDto> CreateFTAsync(CreateFTDto dto, CancellationToken cancellationToken = default)
     {

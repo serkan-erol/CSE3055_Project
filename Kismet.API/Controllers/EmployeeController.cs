@@ -154,15 +154,7 @@ public class EmployeeController : ControllerBase
             
             var created = await _employeeRepository.CreateAsync(dto, cancellationToken);
 
-            //aaa Employee creation does not require an auto-login, so no session is created
-            // Create a new session for the employee and login
-            //var newSession = await _sessionRepository.CreateAsync(new CreateSessionDto
-            //{
-            //    UserID = created.EmployeeID,
-            //    Email = created.ContactEmail,
-            //    RefreshToken = string.Empty,
-            //    RTExpiresAt = DateTimeOffset.UtcNow
-            //}, cancellationToken);
+            // Note: Employee creation does not require an auto-login, so a session is NOT created
             
             // Return Created with Location header pointing to the new resource
             return Created($"/api/employees/{employeeId}/{created.EmployeeID}", created);
@@ -176,7 +168,7 @@ public class EmployeeController : ControllerBase
     /// <summary>
     /// Update employee role
     /// </summary>
-    [HttpPut("{updater-employeeId:int}/role")]
+    [HttpPut("{updaterEmployeeId:int}/role")]
     public async Task<IActionResult> UpdateEmployeeRoleAsync(int updaterEmployeeId, [FromBody] UpdateEmployeeRoleDto dto, CancellationToken cancellationToken)
     {
         try
@@ -229,7 +221,7 @@ public class EmployeeController : ControllerBase
     /// <summary>
     /// Update employee access level
     /// </summary>
-    [HttpPut("{updater-employeeId:int}/access-level")]
+    [HttpPut("{updaterEmployeeId:int}/access-level")]
     public async Task<IActionResult> UpdateEmployeeAccessLevelAsync(int updaterEmployeeId, [FromBody] UpdateEmployeeAccessLevelDto dto, CancellationToken cancellationToken)
     {
         try

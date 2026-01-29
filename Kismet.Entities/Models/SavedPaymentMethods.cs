@@ -29,10 +29,10 @@ namespace Kismet.Entities.Models
         public string CardType { get; set; } = string.Empty;
 
         [Column("CardExpirationDate", TypeName = "date")]
-        public DateTime CardExpirationDate { get; set; }
+        public DateOnly CardExpirationDate { get; set; }
 
         [Column("RecordExpirationDate", TypeName = "date")]
-        public DateTime? RecordExpirationDate { get; set; }
+        public DateOnly? RecordExpirationDate { get; set; }
 
         [Required]
         [Column("CreatedAt")]

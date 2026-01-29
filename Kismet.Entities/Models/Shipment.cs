@@ -41,7 +41,7 @@ namespace Kismet.Entities.Models
         public DateTimeOffset? LockedAt { get; set; }
 
         [Column("ShipmentDate")]
-        public DateTime? ShipmentDate { get; set; }
+        public DateOnly? ShipmentDate { get; set; }
 
         [Column("OriginCountry")]
         public string? OriginCountry { get; set; }
@@ -50,10 +50,10 @@ namespace Kismet.Entities.Models
         public string? DestinationCountry { get; set; }
 
         [Column("ExpectedDeliveryDate")]
-        public DateTime? ExpectedDeliveryDate { get; set; }
+        public DateOnly? ExpectedDeliveryDate { get; set; }
 
         [Column("ActualDeliveryDate")]
-        public DateTime? ActualDeliveryDate { get; set; }
+        public DateOnly? ActualDeliveryDate { get; set; }
 
         [Required]
         [Column("CreatedAt")]

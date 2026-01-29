@@ -7,7 +7,12 @@ var builder = WebApplication.CreateBuilder(args);
 // Host lifetime is tied to the console (Ctrl+C / console close)
 builder.Host.UseConsoleLifetime();
 
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        // DateOnly is natively supported in .NET 9.0 and serializes as ISO 8601 date format (YYYY-MM-DD)
+        options.JsonSerializerOptions.WriteIndented = true;
+    });
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 

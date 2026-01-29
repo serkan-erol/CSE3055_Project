@@ -19,7 +19,7 @@ public class FTResponseToEmployeeDto
     public decimal RemainingBalance { get; set; }
     public PaymentStatus PaymentStatus { get; set; }
     public string? Description { get; set; }
-    public DateTime TransactionDate { get; set; }
+    public DateOnly TransactionDate { get; set; }
     public DateTimeOffset? LastUpdatedAt { get; set; }
 }
 
@@ -36,7 +36,7 @@ public class FTResponseToCustomerDto
     public decimal RemainingBalance { get; set; }
     public PaymentStatus PaymentStatus { get; set; }
     public string? Description { get; set; }
-    public DateTime TransactionDate { get; set; }
+    public DateOnly TransactionDate { get; set; }
     public DateTimeOffset? LastUpdatedAt { get; set; }
 }
 
@@ -82,7 +82,7 @@ public class CreateFTDto
     [StringLength(255)]
     public string? Description { get; set; }
 
-    public DateTime? TransactionDate { get; set; } = DateTime.UtcNow.AddMonths(6);
+    public DateOnly? TransactionDate { get; set; }
 }
 
 /// <summary>
