@@ -71,15 +71,15 @@
 
         DONE 7.9 - Payment: Cut the ties with Billing!!!        
     
-    8 - When the 7 is completed, add more functionality to the front-end for employees.
+    DONE 8 - When the 7 is completed, add more functionality to the front-end for employees.
 
     9 - Update the dbo.trg_Delete_FT_On_Order_Cancelled trigger to re-calculate TotalAmount and TotalPaid based on completed Payments if the order is cancelled
 
     10 - Add a trigger to mark an Order as Cancelled (4) if its Shipments are ALL failed (3)
-        11.1 - Add a trigger to re-calculate an Order's TotalAmount (and therefore creating an update wave) if at least
+        10.1 - Add a trigger to re-calculate an Order's TotalAmount (and therefore creating an update wave) if at least
         one of its Shiptment's has failed but not all
 
-    11 - Customers can add card and bank info but can not modify or delete currently. Improve it.
+    11 - Customers can add card and bank info and delete them but can not modify currently. Improve it.
 
     .
     .
@@ -87,7 +87,7 @@
 
     100 - Add Authorization, and Authentication!
         DONE 100.1 - Customers:
-            DONE + Can sign-up and sign-in
+            DONE + Can register and login
             DONE + Update/Change Name, Email, Phone, Password
             DONE + They can see the fabrics in stock and
             DONE + Place a purchase order by choosing at least 1 fabric from the available fabric list shown to them
@@ -95,10 +95,9 @@
             Like the ones with low stock)
 
         100.2 - Employees:
-            + Can NOT sign-up themselves! They need to be created by another employee, like maybe an admin. 
-            DONE +They can sign-in after they are recorded into the system
+            DONE + Can NOT register themselves! They need to be created by another employee, like maybe an admin. 
+            DONE + They can login after they are recorded into the system
             DONE + All employees can update/change their own Email, Phone, Password
-            + Some, upper AccessLevel employees can modify their own and some other's Name, EmployeeRole, 
-            AccessLevel in addition to the ones above
-            PARTIALLY DONE + Approve or Cancel orders. Currently, approving is workking, Cancel is not
-            + Update orders, shipping, reliability status of customers etc.
+            DONE + Higher AccessLevel employees can modify EmployeeRole, and AccessLevel of other Employees
+            DONE + Approve or Cancel orders.
+            PARTIALLY DONE + Update orders, shipping, reliability status of customers etc.

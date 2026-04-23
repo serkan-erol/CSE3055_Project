@@ -90,7 +90,6 @@ public class BillingRepository : IBillingRepository
     
     /// <summary>
     /// Create a new billing for customer and financial transaction
-    /// //aaa TotalDue should come from Financial Transaction tables
     /// </summary>
     public async Task<BillingResponseToCustomerDto> CreateBillingAsync(CreateBillingDto dto, CancellationToken cancellationToken = default)
     {

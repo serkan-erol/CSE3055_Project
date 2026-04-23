@@ -16,6 +16,7 @@ public class TreasuryController : ControllerBase
     private readonly ILogger<TreasuryController> _logger;
 
     private const int accountantAccessLevel = 4;
+    private const int sysAdminAccessLevel = 9;
 
     public TreasuryController(
         ITreasuryRepository treasuryRepository,
@@ -42,8 +43,8 @@ public class TreasuryController : ControllerBase
                 return NotFound(new { error = "Employee not found" });
             }
 
-            // Check if the employee's access level is exactly 4 (Accountant)
-            if (employee.AccessLevel != accountantAccessLevel)
+            // Check if the employee's access level is exactly 4 or it is 9+ (Accountant or Sys_Admin, CEO)
+            if (employee.AccessLevel != accountantAccessLevel && employee.AccessLevel < sysAdminAccessLevel)
             {
                 return BadRequest(new { error = "Employee does not have permission to get all treasury entries" });
             }

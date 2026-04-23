@@ -45,9 +45,9 @@ namespace Kismet.Entities.Models
         public string? PaymentTerms { get; set; }
 
         [Required]
-        [Column("BillingDate")]
+        [Column("BillingDate", TypeName = "date")]
         //aaa [DatabaseGenerated(DatabaseGeneratedOption.Computed)]
-        public DateTime BillingDate { get; set; }
+        public DateOnly BillingDate { get; set; }
 
         [Required]
         [Column("BillingStatus", TypeName = "int")]

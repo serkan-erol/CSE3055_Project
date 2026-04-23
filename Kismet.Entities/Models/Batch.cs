@@ -47,7 +47,7 @@ namespace Kismet.Entities.Models
         public decimal BatchPrice { get; set; }
 
         [Column("ProductionDate")]
-        public DateTime? ProductionDate { get; set; }
+        public DateOnly? ProductionDate { get; set; }
 
         [Column("QualityGrade")]
         public string? QualityGrade { get; set; }

@@ -10,10 +10,13 @@ namespace Kismet.Repository.Repositories;
 public class PaymentRepository : IPaymentRepository
 {
     private readonly IDbConnectionFactory _connectionFactory;
+    private readonly IFinancialTransactionRepository _financialTransactionRepository;
 
-    public PaymentRepository(IDbConnectionFactory connectionFactory)
+    public PaymentRepository(IDbConnectionFactory connectionFactory, 
+                             IFinancialTransactionRepository financialTransactionRepository)
     {
         _connectionFactory = connectionFactory;
+        _financialTransactionRepository = financialTransactionRepository;
     }
 
     /// <summary>
@@ -39,13 +42,23 @@ public class PaymentRepository : IPaymentRepository
     {
         using var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken);
 
-        // Build the query dynamically based on the parameters
-            var query = SqlQueries.Payment.GetAllPayments + " WHERE p.CustomerID = @CustomerID ORDER BY p.PaymentID";
+        // Find all the FTs for the customer
+        var fts = await _financialTransactionRepository.GetFTForCustomerAsync(customerId, cancellationToken);
 
-        // Execute the query and return the FT
-        var payments = await connection.QueryAsync<PaymentResponseDto>(
-            new CommandDefinition(query, new { CustomerID = customerId }, cancellationToken: cancellationToken));
-        return payments.ToList().AsReadOnly();
+        // List to store all the payments
+        var allPayments = new List<PaymentResponseDto>();
+
+        foreach (var ft in fts)
+        {
+            // Build the query dynamically based on the parameters for each FT
+            var query = SqlQueries.Payment.GetAllPayments + " WHERE p.FTransactionID = @FTransactionID ORDER BY p.PaymentID";
+
+            // Execute the query and return the payments
+            var ftPayments = await connection.QueryAsync<PaymentResponseDto>(
+                new CommandDefinition(query, new { FTransactionID = ft.FTransactionID }, cancellationToken: cancellationToken));
+            allPayments.AddRange(ftPayments);
+        }
+        return allPayments;
     }
 
     /// <summary>

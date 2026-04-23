@@ -373,9 +373,9 @@ public static class SqlQueries
             VALUES (@CustomerID, @BillingType, @InvoiceNumber, @TotalDue, @PaymentTerms, @BillingDate);
             SELECT CAST(SCOPE_IDENTITY() as int);";
 
-        // aaa
         // Depending on our decision on how to implement Billing and FT connections,
         // We may need or we may delete this query.
+        // Redundant!!! We opt to NOT update the BillingType.
         public const string UpdateBillingType = @"
             UPDATE dbo.[Billing]
             SET 
@@ -478,7 +478,10 @@ public static class SqlQueries
         public const string FindSuitableBillingEntryForFT = @"
             SELECT TOP 1 *
             FROM dbo.[Billing] b
-            WHERE b.CustomerID = @CustomerID AND b.BillingType = @TransactionType AND b.BillingDate >= @TransactionDate
+            WHERE b.CustomerID = @CustomerID 
+                AND b.BillingType = @TransactionType 
+                AND b.BillingDate >= @TransactionDate
+                AND b.BillingStatus != 2
             ORDER BY b.BillingDate DESC, b.BillingID DESC";
     }
 
@@ -880,30 +883,30 @@ public static class SqlQueries
             FROM dbo.[Batch]
             WHERE OrderID = @OrderID";
     }
-public static class Views
-{
-    // Get order details for a customer
-    public const string GetOrderDetailsByCustomer = @"
-        SELECT * FROM vw_OrderDetails 
-        WHERE CustomerID = @CustomerID
-        ORDER BY OrderDate DESC";
 
-    // Get shipment tracking for a customer
-    public const string GetShipmentTrackingByCustomer = @"
-        SELECT * FROM vw_ShipmentTracking 
-        WHERE CustomerID = @CustomerID
-        ORDER BY ShipmentDate DESC";
+    public static class Views
+    {
+        // Get order details for a customer
+        public const string GetOrderDetailsByCustomer = @"
+            SELECT * FROM vw_OrderDetails 
+            WHERE CustomerID = @CustomerID
+            ORDER BY OrderDate DESC";
 
-    // Get financial overview for a customer
-    public const string GetFinancialOverviewByCustomer = @"
-        SELECT * FROM vw_FinancialOverview 
-        WHERE CustomerID = @CustomerID
-        ORDER BY TransactionDate DESC";
+        // Get shipment tracking for a customer
+        public const string GetShipmentTrackingByCustomer = @"
+            SELECT * FROM vw_ShipmentTracking 
+            WHERE CustomerID = @CustomerID
+            ORDER BY ShipmentDate DESC";
 
-    // Get inventory status for a fabric
-    public const string GetInventoryStatusByFabric = @"
-        SELECT * FROM vw_InventoryProductionStatus 
-        WHERE FabricID = @FabricID";
-}
+        // Get financial overview for a customer
+        public const string GetFinancialOverviewByCustomer = @"
+            SELECT * FROM vw_FinancialOverview 
+            WHERE CustomerID = @CustomerID
+            ORDER BY TransactionDate DESC";
 
+        // Get inventory status for a fabric
+        public const string GetInventoryStatusByFabric = @"
+            SELECT * FROM vw_InventoryProductionStatus 
+            WHERE FabricID = @FabricID";
+    }
 }

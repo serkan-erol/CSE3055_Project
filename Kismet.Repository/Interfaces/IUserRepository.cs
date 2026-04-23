@@ -18,7 +18,7 @@ public interface IUserRepository
     Task<UserResponseDto?> UpdateUserEmailAsync(UpdateUserEmailDto dto, CancellationToken cancellationToken = default);
     Task<UserResponseDto?> UpdateUserPhoneAsync(UpdateUserPhoneDto dto, CancellationToken cancellationToken = default);
     Task<UserResponseDto?> UpdateUserPasswordAsync(UpdateUserPasswordDto dto, CancellationToken cancellationToken = default);
-    
+    Task<bool> UpdateUserPasswordToHashAsync(int userId, string passwordHash, CancellationToken cancellationToken = default);
     // Delete 
     Task<bool> DeleteAsync(int userId, CancellationToken cancellationToken = default);
 }
