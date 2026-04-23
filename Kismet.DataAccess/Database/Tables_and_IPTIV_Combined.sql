@@ -2036,31 +2036,31 @@ VALUES ('Cotton', '100% Cotton', 'Silver', 1.00, 100, 10.00, 'Silver cotton fabr
 INSERT INTO dbo.[Fabric] (FabricType, Composition, Color, WeightPerUnit, StockQuantity, UnitPrice, Description)
 VALUES ('Cotton', '100% Cotton', 'Gold', 1.00, 100, 10.00, 'Gold cotton fabric');
 INSERT INTO dbo.[Fabric] (FabricType, Composition, Color, WeightPerUnit, StockQuantity, UnitPrice, Description)
-VALUES ('Polyester', '70% Polyester + 30% Cotton', 'Gold', 1.00, 100, 10.00, 'White polyester fabric');
+VALUES ('Polyester', '70% Polyester + 30% Cotton', 'White', 1.00, 100, 10.00, 'White polyester fabric');
 INSERT INTO dbo.[Fabric] (FabricType, Composition, Color, WeightPerUnit, StockQuantity, UnitPrice, Description)
-VALUES ('Polyester', '70% Polyester + 30% Cotton', 'White', 1.00, 100, 10.00, 'Red polyester fabric');
+VALUES ('Polyester', '70% Polyester + 30% Cotton', 'Red', 1.00, 100, 10.00, 'Red polyester fabric');
 INSERT INTO dbo.[Fabric] (FabricType, Composition, Color, WeightPerUnit, StockQuantity, UnitPrice, Description)
-VALUES ('Polyester', '70% Polyester + 30% Cotton', 'White', 1.00, 100, 10.00, 'Blue polyester fabric');
+VALUES ('Polyester', '70% Polyester + 30% Cotton', 'Blue', 1.00, 100, 10.00, 'Blue polyester fabric');
 INSERT INTO dbo.[Fabric] (FabricType, Composition, Color, WeightPerUnit, StockQuantity, UnitPrice, Description)
-VALUES ('Polyester', '70% Polyester + 30% Cotton', 'White', 1.00, 100, 10.00, 'Green polyester fabric');
+VALUES ('Polyester', '70% Polyester + 30% Cotton', 'Green', 1.00, 100, 10.00, 'Green polyester fabric');
 INSERT INTO dbo.[Fabric] (FabricType, Composition, Color, WeightPerUnit, StockQuantity, UnitPrice, Description)
-VALUES ('Polyester', '70% Polyester + 30% Cotton', 'White', 1.00, 100, 10.00, 'Yellow polyester fabric');
+VALUES ('Polyester', '70% Polyester + 30% Cotton', 'Yellow', 1.00, 100, 10.00, 'Yellow polyester fabric');
 INSERT INTO dbo.[Fabric] (FabricType, Composition, Color, WeightPerUnit, StockQuantity, UnitPrice, Description)
-VALUES ('Polyester', '70% Polyester + 30% Cotton', 'White', 1.00, 100, 10.00, 'Purple polyester fabric');
+VALUES ('Polyester', '70% Polyester + 30% Cotton', 'Purple', 1.00, 100, 10.00, 'Purple polyester fabric');
 INSERT INTO dbo.[Fabric] (FabricType, Composition, Color, WeightPerUnit, StockQuantity, UnitPrice, Description)
-VALUES ('Polyester', '70% Polyester + 30% Cotton', 'White', 1.00, 100, 10.00, 'Orange polyester fabric');
+VALUES ('Polyester', '70% Polyester + 30% Cotton', 'Orange', 1.00, 100, 10.00, 'Orange polyester fabric');
 INSERT INTO dbo.[Fabric] (FabricType, Composition, Color, WeightPerUnit, StockQuantity, UnitPrice, Description)
-VALUES ('Polyester', '70% Polyester + 30% Cotton', 'White', 1.00, 100, 10.00, 'Pink polyester fabric');
+VALUES ('Polyester', '70% Polyester + 30% Cotton', 'Pink', 1.00, 100, 10.00, 'Pink polyester fabric');
 INSERT INTO dbo.[Fabric] (FabricType, Composition, Color, WeightPerUnit, StockQuantity, UnitPrice, Description)
-VALUES ('Polyester', '70% Polyester + 30% Cotton', 'White', 1.00, 100, 10.00, 'Brown polyester fabric');
+VALUES ('Polyester', '70% Polyester + 30% Cotton', 'Brown', 1.00, 100, 10.00, 'Brown polyester fabric');
 INSERT INTO dbo.[Fabric] (FabricType, Composition, Color, WeightPerUnit, StockQuantity, UnitPrice, Description)
-VALUES ('Polyester', '70% Polyester + 30% Cotton', 'White', 1.00, 100, 10.00, 'Black polyester fabric');
+VALUES ('Polyester', '70% Polyester + 30% Cotton', 'Black', 1.00, 100, 10.00, 'Black polyester fabric');
 INSERT INTO dbo.[Fabric] (FabricType, Composition, Color, WeightPerUnit, StockQuantity, UnitPrice, Description)
-VALUES ('Polyester', '70% Polyester + 30% Cotton', 'White', 1.00, 100, 10.00, 'Gray polyester fabric');
+VALUES ('Polyester', '70% Polyester + 30% Cotton', 'Gray', 1.00, 100, 10.00, 'Gray polyester fabric');
 INSERT INTO dbo.[Fabric] (FabricType, Composition, Color, WeightPerUnit, StockQuantity, UnitPrice, Description)
-VALUES ('Polyester', '70% Polyester + 30% Cotton', 'White', 1.00, 100, 10.00, 'Silver polyester fabric');
+VALUES ('Polyester', '70% Polyester + 30% Cotton', 'Silver', 1.00, 100, 10.00, 'Silver polyester fabric');
 INSERT INTO dbo.[Fabric] (FabricType, Composition, Color, WeightPerUnit, StockQuantity, UnitPrice, Description)
-VALUES ('Polyester', '70% Polyester + 30% Cotton', 'White', 1.00, 100, 10.00, 'Gold polyester fabric');
+VALUES ('Polyester', '70% Polyester + 30% Cotton', 'Gold', 1.00, 100, 10.00, 'Gold polyester fabric');
 GO
 
 ---------------------------------------------------------------------------------------------------------------

@@ -95,7 +95,7 @@ public class SessionController : ControllerBase
                 // First, hash the password
                 // So we can compare the hashed password with the password in the DTO for login verification
                 // And we can save the hashed password to the DB for extra security
-                passwordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password);
+                passwordHash = BCrypt.Net.BCrypt.HashPassword(user.PasswordHash);
 
                 // Then, save the hashed password to the DB
                 await _userRepository.UpdateUserPasswordToHashAsync(user.UserID, passwordHash, cancellationToken);

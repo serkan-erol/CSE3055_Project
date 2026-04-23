@@ -59,7 +59,7 @@ app.UseAuthorization();
 
 app.MapControllers();
 
-//aaa app.MapGet("/", () => Results.Redirect("/swagger/index.html", true, true)).AllowAnonymous();
+app.MapGet("/", () => Results.Redirect("/swagger/index.html", true, true)).AllowAnonymous();
 
 // Force HTTP for development
 app.Run("http://localhost:3055/");
